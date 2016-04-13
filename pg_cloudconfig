@@ -61,6 +61,7 @@ function configure_grub()
 # Change PostgreSQL configuration
 function configure_postgresql()
 {
+    # If pg_conftool is available use it, otherwise modify the file.
     if command -v pg_conftool >/dev/null 2>&1; then
         pg_conftool "$pgconf" set "$1" "$2"
     else
@@ -76,30 +77,53 @@ configure_grub "elevator=" 'GRUB_CMDLINE_LINUX="elevator=deadline"'
 
 # Autoconf
 cpucount=$(nproc)
-totalram_kB=$(cat /proc/meminfo | grep MemTotal | awk '{ print $2 }')
-totalram_MB=$(($totalram_kB/1000))
+total_mem_kB=$(cat /proc/meminfo | grep MemTotal | awk '{ print $2 }')
+total_mem_MB=$(( $total_mem_kB / 1000 ))
 
 echo "Generate PostgreSQL parameters"
-shared_buffers_MB=$(($totalram_MB / 4))
+shared_buffers_MB=$(( $total_mem_MB / 4 ))
 if (( $shared_buffers_MB > 12000 ))
 then
     shared_buffers_MB=12000
 fi
 
-work_mem_MB=16
+work_mem_MB=32
 maintenance_work_mem_MB=512
 autovacuum_max_workers=$(( $cpucount + 2 ))
-effective_cache_size_MB=$(( $totalram_MB / 2 ))
+
+if (( $total_mem_MB < 1900 ))
+then
+    echo "Configure for micro instance!"
+    shared_buffers_MB=128
+    work_mem_MB=4
+    maintenance_work_mem_MB=64
+    effective_cache_size_MB=256
+elif (( $total_mem_MB < 3900 ))
+then
+    echo "Configure for small instance!"
+    shared_buffers_MB=512
+    work_mem_MB=8
+    maintenance_work_mem_MB=128
+    effective_cache_size_MB=1024
+fi
+
+used_mem_global_MB=$(( $shared_buffers_MB + $maintenance_work_mem_MB ))
+used_mem_connection_MB=$(( 12 + $work_mem_MB ))
+max_connections=$(echo "($total_mem_MB - $used_mem_global_MB) / $used_mem_connection_MB * 0.6" | bc )
+max_connections=${max_connections%.*}
+effective_cache_size_MB=$( echo "$total_mem_MB * 0.4" | bc)
+effective_cache_size_MB=${effective_cache_size_MB%.*}
+
 
 echo "Tune postgresql.conf"
 # CONNECTIONS AND AUTHENTICATION
 configure_postgresql "port" "5432"
-configure_postgresql "max_connections" "50"
+configure_postgresql "max_connections" $max_connections
 configure_postgresql "superuser_reserved_connections" "5"
 
 # RESOURCE USAGE (except WAL)
 configure_postgresql "shared_buffers" "${shared_buffers_MB}MB"
-configure_postgresql "work_mem" "${work_mem_MB}"
+configure_postgresql "work_mem" "${work_mem_MB}MB"
 configure_postgresql "maintenance_work_mem" "${maintenance_work_mem_MB}MB"
 configure_postgresql "shared_preload_libraries" "pg_stat_statements"
 
