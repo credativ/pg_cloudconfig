@@ -73,6 +73,22 @@ def shared_buffers(pg_in, system, log):
     sb = round_power_of_2_floor(sb)
     return str(sb)+"MB"
 
+def maintenance_work_mem_MB(pg_in, system, log):
+    # Get total available memory as MB
+    total = system['memory']['total'] / 1024
+
+    # Get a candidate value
+    candidate = total / 10
+
+    # Special cases for small memory
+    if candidate > 16384:
+        mwm = 16384
+    else:
+        mwm = candidate
+
+    mwm = round_power_of_2_floor(mwm)
+    return str(mwm)+"MB"
+
 def tune(pg_in, system, log):
     """
     Set multiple PostgreSQL settings according to the given input
@@ -82,6 +98,7 @@ def tune(pg_in, system, log):
 
     pg_out = {}
     pg_out['shared_buffers'] = shared_buffers(pg_in, system, log)
+    pg_out['maintenance_work_mem_MB'] = maintenance_work_mem_MB(pg_in, system, log)
 
 
     return pg_out
