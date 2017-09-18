@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright © 2016 Alexander Sosna <alexander.sosna@credativ.de>
+# Copyright © 2017 Alexander Sosna <alexander.sosna@credativ.de>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -69,23 +69,23 @@ function configure_postgresql()
     fi
 }
 
-echo "Set deadline scheduler for all devices"
-configure_grub "elevator=" 'GRUB_CMDLINE_LINUX="elevator=deadline"'
-
-# echo "Update grub configuration"
-#update-grub2
+function gen_shared_buffers() {
+        $(( $total_mem_MB / 4 ))
+    if (( $shared_buffers_MB > 12000 ))
+    then
+        shared_buffers_MB=12000
+    fi
+}
 
 # Autoconf
 cpucount=$(nproc)
 total_mem_kB=$(cat /proc/meminfo | grep MemTotal | awk '{ print $2 }')
 total_mem_MB=$(( $total_mem_kB / 1000 ))
 
-echo "Generate PostgreSQL parameters"
-shared_buffers_MB=$(( $total_mem_MB / 4 ))
-if (( $shared_buffers_MB > 12000 ))
-then
-    shared_buffers_MB=12000
-fi
+echo "CPU count: $cpucount"
+echo "Memory: $total_mem_MB MB"
+
+shared_buffers_MB = genshared_buffers()
 
 work_mem_MB=32
 maintenance_work_mem_MB=512
