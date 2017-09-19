@@ -20,9 +20,13 @@ import argparse
 import psutil
 import logging
 import math
+from pint import UnitRegistry
+
 
 # Global variables
 SUPPORTED_VERSIONS = ['9.6']
+ureg = UnitRegistry()
+Q_ = ureg.Quantity
 
 def memory():
     """
@@ -71,9 +75,9 @@ def shared_buffers(pg_in, system, log):
         sb = candidate
 
     sb = round_power_of_2_floor(sb)
-    return str(sb)+"MB"
+    return sb * ureg.megabyte
 
-def maintenance_work_mem_MB(pg_in, system, log):
+def maintenance_work_mem(pg_in, system, log):
     # Get total available memory as MB
     total = system['memory']['total'] / 1024
 
@@ -89,6 +93,30 @@ def maintenance_work_mem_MB(pg_in, system, log):
     mwm = round_power_of_2_floor(mwm)
     return str(mwm)+"MB"
 
+def max_connections(pg_out, pg_in, system, log):
+    # If max_connections are given we use it
+    if pg_in['max_connections'] > 0:
+        return pg_in['max_connections']
+
+    # Possible max_connections based on cpu_count
+    cpu_candidate = system['cpu_count'] * 10
+
+    connection_ram = system['memory']['total']
+    connection_ram -= pg_out['shared_buffers']
+    connection_ram -= pg_out['maintenance_work_mem']
+
+    # Estimate possible workmem
+    workmem_candidate = round_power_of_2_floor(connection_ram / cpu_candidate)
+
+    # Calculate possible max_connections based on workmem only
+    return int(connection_ram / workmem_candidate)
+
+def work_mem(pg_out, pg_in, system, log):
+    connection_ram = system['memory']['total']
+    connection_ram -= pg_out['shared_buffers']
+    connection_ram -= pg_out['maintenance_work_mem']
+    return round_power_of_2_floor(connection_ram / pg_out['max_connections'])
+
 def tune(pg_in, system, log):
     """
     Set multiple PostgreSQL settings according to the given input
@@ -98,7 +126,9 @@ def tune(pg_in, system, log):
 
     pg_out = {}
     pg_out['shared_buffers'] = shared_buffers(pg_in, system, log)
-    pg_out['maintenance_work_mem_MB'] = maintenance_work_mem_MB(pg_in, system, log)
+    pg_out['maintenance_work_mem'] = maintenance_work_mem(pg_in, system, log)
+    pg_out['max_connections'] = max_connections(pg_out, pg_in, system, log)
+    pg_out['work_mem'] = work_mem(pg_out, pg_in, system, log)
 
 
     return pg_out
@@ -127,6 +157,8 @@ def main():
                         help='Version of the PostgreSQL cluster to tune.')
     parser.add_argument('--pg_clustername', default="main",
                         help='Name of the PostgreSQL cluster to tune.')
+    parser.add_argument('--max_connections', default="",
+                        help='Set the max_connections explicitly if needed')
     parser.add_argument('--pg_conf_dir', default="",
                         help='Path to the dir holding the postgresql.conf (normally not necessary to set explicitly!).')
     args = parser.parse_args()
@@ -141,6 +173,11 @@ def main():
     if args.pg_conf_dir > "":
         pg_conf_dir = args.pg_conf_dir
     pg['conf'] = pg['conf_dir'] + "/postgresql.conf"
+
+    if args.max_connections > "":
+        pg['max_connections'] = args.max_connections
+    else:
+        pg['max_connections'] = -1
 
     # Show information
     log.info("Variables")
