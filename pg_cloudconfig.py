@@ -38,60 +38,68 @@ def memory():
         for i in meminfo:
             sline = i.split()
             if str(sline[0]) == 'MemTotal:':
-                mem['total'] = int(sline[1])
+                mem['total'] = int(sline[1]) * ureg.kilobytes
             elif str(sline[0]) in ('MemFree:', 'Buffers:', 'Cached:'):
-                free += int(sline[1])
+                free += int(sline[1]) * ureg.kilobytes
         mem['free'] = free
-        mem['used'] = int(mem['total']) - int(mem['free'])
+        mem['used'] = mem['total'] - mem['free']
     return mem
 
 def round_power_of_2_ceil(number):
     return int(math.pow(2,math.ceil(math.log(number,2))))
 
+def round_power_of_2_ceil_mb(mem):
+    mem_mb = mem.to(ureg.megabyte).magnitude
+    ceil_mb = int(math.pow(2,math.ceil(math.log(mem_mb,2))))
+    return ceil_mb * ureg.megabyte
+
 def round_power_of_2_floor(number):
     return int(math.pow(2,math.floor(math.log(number,2))))
 
+def round_power_of_2_floor_mb(mem):
+    mem_mb = mem.to(ureg.megabyte).magnitude
+    floor_mb = int(math.pow(2,math.floor(math.log(mem_mb,2))))
+    return floor_mb * ureg.megabyte
+
+
 def shared_buffers(pg_in, system, log):
     # Get total available memory as MB
-    total = system['memory']['total'] / 1024
+    total = system['memory']['total']
 
     # Get a candidate value
-    candidate = total / 4
+    candidate = total / 5
 
     # Special cases for small memory
-    if total < 4096:
-        sb = 256
-        if total < 1024:
-            sb = 128
-        if total < 512:
-            sb = 64
-        if total < 256:
-            sb = 16
-        if total < 128:
-            sb = 4
-    elif candidate > 16384:
-        sb = 16384
+    if total < 4096 * ureg.megabyte:
+        sb = 256 * ureg.megabyte
+        if total < 1024 * ureg.megabyte:
+            sb = 128 * ureg.megabyte
+        if total < 512 * ureg.megabyte:
+            sb = 64 * ureg.megabyte
+        if total < 256 * ureg.megabyte:
+            sb = 16 * ureg.megabyte
+        if total < 128 * ureg.megabyte:
+            sb = 4 * ureg.megabyte
+    elif candidate > 16 * ureg.gigabyte:
+        sb = 16 * ureg.gigabyte
     else:
         sb = candidate
 
-    sb = round_power_of_2_floor(sb)
-    return sb * ureg.megabyte
+    return round_power_of_2_floor_mb(sb)
 
 def maintenance_work_mem(pg_in, system, log):
     # Get total available memory as MB
-    total = system['memory']['total'] / 1024
+    total = system['memory']['total']
 
     # Get a candidate value
     candidate = total / 10
 
     # Special cases for small memory
-    if candidate > 16384:
-        mwm = 16384
+    if candidate > 16 * ureg.gigabyte:
+        mwm = 16 * ureg.gigabyte
     else:
         mwm = candidate
-
-    mwm = round_power_of_2_floor(mwm)
-    return str(mwm)+"MB"
+    return round_power_of_2_floor_mb(mwm)
 
 def max_connections(pg_out, pg_in, system, log):
     # If max_connections are given we use it
@@ -99,23 +107,24 @@ def max_connections(pg_out, pg_in, system, log):
         return pg_in['max_connections']
 
     # Possible max_connections based on cpu_count
-    cpu_candidate = system['cpu_count'] * 10
+    cpu_candidate = system['cpu_count'] * 15
 
-    connection_ram = system['memory']['total']
-    connection_ram -= pg_out['shared_buffers']
-    connection_ram -= pg_out['maintenance_work_mem']
+    connection_ram = system['memory']['total'].to(ureg.megabyte).magnitude
+    connection_ram -= pg_out['shared_buffers'].to(ureg.megabyte).magnitude
+    connection_ram -= pg_out['shared_buffers'].to(ureg.megabyte).magnitude # keep some space for the fs cache
+    connection_ram -= pg_out['maintenance_work_mem'].to(ureg.megabyte).magnitude
 
     # Estimate possible workmem
     workmem_candidate = round_power_of_2_floor(connection_ram / cpu_candidate)
 
     # Calculate possible max_connections based on workmem only
-    return int(connection_ram / workmem_candidate)
+    return int(round(connection_ram / workmem_candidate,-1))
 
 def work_mem(pg_out, pg_in, system, log):
     connection_ram = system['memory']['total']
     connection_ram -= pg_out['shared_buffers']
     connection_ram -= pg_out['maintenance_work_mem']
-    return round_power_of_2_floor(connection_ram / pg_out['max_connections'])
+    return round_power_of_2_floor_mb(connection_ram / pg_out['max_connections'])
 
 def tune(pg_in, system, log):
     """
