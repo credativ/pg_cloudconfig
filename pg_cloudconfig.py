@@ -16,13 +16,16 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import os
 import argparse
 import psutil
 import logging
 import math
 import sys
+import subprocess
 from pint import UnitRegistry
-from subprocess import call
+from datetime import datetime
+from statistics import median
 
 # Global variables
 SUPPORTED_VERSIONS = ['9.6']
@@ -168,6 +171,102 @@ def autovacuum_max_workers(pg_in, system, log):
     return int(amw)
 
 
+def format_for_pg_conf(si):
+    if isinstance(si, int) or isinstance(si, str) or isinstance(si, float):
+        # Seams to be a basic type so we just return the value as string
+        return str(si)
+
+    base = si.to_base_units()
+    if base.units == "bit":
+        si_mb = si.to(ureg.megabyte).magnitude
+        return str(si_mb) + "MB"
+
+
+def persist_conf(pg_out, pg_in, log):
+    try:
+        filehandle = open(pg_in['conf'], 'r+')
+    except IOError:
+        log.error(
+            'Unable to open postgresql.conf for writing, ' + pg_in['conf'])
+        sys.exit(1)
+    filehandle.close()
+
+    for key, value in pg_out.items():
+        setting = format_for_pg_conf(value)
+        log.info("set " + key + ": " + str(setting))
+        ret = subprocess.call(
+            ["pg_conftool", pg_in['version'], pg_in['clustername'], pg_in['conf'], "set", key, setting])
+        if ret != 0:
+            log.error("Error while setting: " + key +
+                      " to: " + setting + " with return code: " + ret)
+
+
+def repeat_to_length(string_to_expand, length):
+    return (string_to_expand * int((length / len(string_to_expand)) + 1))[:length]
+
+
+def chomp(x):
+    if x.endswith("\r\n"):
+        return x[:-2]
+    if x.endswith("\n"):
+        return x[:-1]
+    return x
+
+
+def show_setting(pg, key):
+    ret = (subprocess.check_output(
+        ["pg_conftool", "--short", pg['version'], pg['clustername'], pg['conf'], "show", key]))
+    return chomp(ret.decode('UTF-8'))
+
+
+def data_directory(pg):
+    return show_setting(pg, "data_directory")
+
+
+def write_test(file, log):
+    testdata = repeat_to_length(
+        "This is a test string and should be much more random!11!!!1!!!djefoirhnfonndojwpdojawpodjpajdpoajdpaojdpjadpojadoja", (1024 * 1024 * 16))
+    runtime = []
+    for i in range(0, 9):
+        startTime = datetime.now()
+        try:
+            fh = open(file, 'w+')
+        except IOError:
+            log.error(
+                'Unable to open test file for writing, ' + file)
+            sys.exit(1)
+        fh.write(testdata)
+        fh.flush()
+        fh.close()
+        delta = datetime.now() - startTime
+        runtime.append(delta.microseconds)
+    os.remove(file)
+    return runtime
+
+
+def write_bench(file, log):
+    results = write_test(file, log)
+    for i in results:
+        log.debug("run took " + str(i))
+    med = int(median(results))
+    mean = int(sum(results) / len(results))
+    log.debug("median: " + str(med))
+    log.debug("mean: " + str(mean))
+
+    # Example disk
+    # DEBUG - median: 237622
+    # DEBUG - mean:   205075
+    # Example ssd
+    # DEBUG - median:  32335
+    # DEBUG - mean:    35998
+    if med > 100000 or mean > 120000:
+        return "slow"
+    elif med > 50000 or mean > 60000:
+        return "medium"
+    else:
+        return "fast"
+
+
 def tune(pg_in, system, log):
     """
     Set multiple PostgreSQL settings according to the given input
@@ -197,36 +296,6 @@ def tune(pg_in, system, log):
         pg_in, system, log)
 
     return pg_out
-
-
-def format_for_pg_conf(si):
-    if isinstance(si, int) or isinstance(si, str) or isinstance(si, float):
-        # Seams to be a basic type so we just return the value as string
-        return str(si)
-
-    base = si.to_base_units()
-    if base.units == "bit":
-        si_mb = si.to(ureg.megabyte).magnitude
-        return str(si_mb) + "MB"
-
-
-def persist_conf(pg_out, pg_in, log):
-    try:
-        filehandle = open(pg_in['conf'], 'r+')
-    except IOError:
-        log.error(
-            'Unable to open postgresql.conf for writing, ' + pg_in['conf'])
-        sys.exit(1)
-    filehandle.close()
-
-    for key, value in pg_out.items():
-        setting = format_for_pg_conf(value)
-        log.info("set " + key + ": " + str(setting))
-        ret = call(
-            ["pg_conftool", pg_in['version'], pg_in['clustername'], pg_in['conf'], "set", key, setting])
-        if ret != 0:
-            log.error("Error while setting: " + key +
-                      " to: " + setting + " with return code: " + ret)
 
 
 def main():
@@ -275,6 +344,14 @@ def main():
         pg['max_connections'] = args.max_connections
     else:
         pg['max_connections'] = -1
+
+    pg['data_directory'] = data_directory(pg)
+
+    log.info("Start write bench in: " + pg['data_directory'])
+    pg['disk_speed'] = write_bench(
+        os.path.join(pg['data_directory'], "~write_test.dat"), log)
+    log.info("Disk was benched as: " +
+             pg['disk_speed'] + " (slow|medium|fast)")
 
     # Show information
     log.debug("Variables")
