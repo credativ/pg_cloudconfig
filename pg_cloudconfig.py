@@ -144,12 +144,18 @@ def work_mem(pg_out, pg_in, system, log):
 
 def effective_cache_size(pg_out, pg_in, system, log):
     usage_factor = 0.6
-    connection_ram = system['memory']['total']
-    connection_ram -= pg_out['shared_buffers']
-    connection_ram -= pg_out['maintenance_work_mem']
-    connection_ram -= pg_out['work_mem'] * pg_out[
+    cache_ram = system['memory']['total']
+    cache_ram -= pg_out['shared_buffers']
+    cache_ram -= pg_out['maintenance_work_mem']
+    cache_ram -= pg_out['work_mem'] * pg_out[
         'max_connections'] * usage_factor
-    return round_power_of_2_floor_mb(connection_ram)
+
+    # If we are running on fast SSDs we can assume a larger cash
+    # to push PostgreSQL to do less sequential scans
+    if pg_in['disk_speed'] == "fast":
+        cache_ram *= 2
+
+    return round_power_of_2_floor_mb(cache_ram)
 
 
 def superuser_reserved_connections(pg_out, pg_in, system, log):
@@ -170,6 +176,13 @@ def autovacuum_max_workers(pg_in, system, log):
         amw = 7
     return int(amw)
 
+def vacuum_cost_limit(pg_in, system, log):
+    if pg_in['disk_speed'] == "fast":
+        return 800
+    elif pg_in['disk_speed'] == "medium":
+        return 600
+    elif pg_in['disk_speed'] == "slow":
+        return 200
 
 def format_for_pg_conf(si):
     if isinstance(si, int) or isinstance(si, str) or isinstance(si, float):
@@ -281,7 +294,6 @@ def tune(pg_in, system, log):
     pg_out['checkpoint_completion_target'] = 0.8
     pg_out['min_wal_size'] = "128MB"
     pg_out['max_wal_size'] = "4GB"
-    pg_out['vacuum_cost_limit'] = "600"
 
     # Dynamic setting
     pg_out['shared_buffers'] = shared_buffers(pg_in, system, log)
@@ -294,6 +306,7 @@ def tune(pg_in, system, log):
         pg_out, pg_in, system, log)
     pg_out['autovacuum_max_workers'] = autovacuum_max_workers(
         pg_in, system, log)
+    pg_out['vacuum_cost_limit'] = vacuum_cost_limit(pg_in, system, log)
 
     return pg_out
 
