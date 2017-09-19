@@ -20,6 +20,7 @@ import argparse
 import psutil
 import logging
 import math
+import sys
 from pint import UnitRegistry
 from subprocess import call
 
@@ -101,8 +102,8 @@ def maintenance_work_mem(pg_in, system, log):
     candidate = total / 10
 
     # Special cases for small memory
-    if candidate > 16 * ureg.gigabyte:
-        mwm = 16 * ureg.gigabyte
+    if candidate > 8 * ureg.gigabyte:
+        mwm = 8 * ureg.gigabyte
     else:
         mwm = candidate
     return round_power_of_2_floor_mb(mwm)
@@ -157,6 +158,20 @@ def superuser_reserved_connections(pg_out, pg_in, system, log):
     return src
 
 
+def autovacuum_max_workers(pg_in, system, log):
+    cc = system['cpu_count']
+    amw = 4
+    if cc <= 4:
+        awm = 2
+    if cc >= 16:
+        awm = 5
+    if cc >= 32:
+        amw = 7
+    if cc > 64:
+        awm = int(cc * 0.20)
+    return int(amw)
+
+
 def tune(pg_in, system, log):
     """
     Set multiple PostgreSQL settings according to the given input
@@ -165,6 +180,15 @@ def tune(pg_in, system, log):
         log.error("Version is not supported, " + pg_in['version'])
 
     pg_out = {}
+    # Static settings
+    pg_out['wal_level'] = "replica"
+    pg_out['checkpoint_timeout'] = "15min"
+    pg_out['checkpoint_completion_target'] = 0.8
+    pg_out['min_wal_size'] = "128MB"
+    pg_out['max_wal_size'] = "4GB"
+    pg_out['vacuum_cost_limit'] = "400"
+
+    # Dynamic setting
     pg_out['shared_buffers'] = shared_buffers(pg_in, system, log)
     pg_out['maintenance_work_mem'] = maintenance_work_mem(pg_in, system, log)
     pg_out['max_connections'] = max_connections(pg_out, pg_in, system, log)
@@ -173,11 +197,15 @@ def tune(pg_in, system, log):
         pg_out, pg_in, system, log)
     pg_out['superuser_reserved_connections'] = superuser_reserved_connections(
         pg_out, pg_in, system, log)
+    pg_out['autovacuum_max_workers'] = autovacuum_max_workers(
+        pg_in, system, log)
+
     return pg_out
 
+
 def format_for_pg_conf(si):
-    if isinstance(si, int) or isinstance(si, str):
-        # Seams to be int or string so we just return the value
+    if isinstance(si, int) or isinstance(si, str) or isinstance(si, float):
+        # Seams to be a basic type so we just return the value as string
         return str(si)
 
     base = si.to_base_units()
@@ -185,13 +213,25 @@ def format_for_pg_conf(si):
         si_mb = si.to(ureg.megabyte).magnitude
         return str(si_mb) + "MB"
 
+
 def persist_conf(pg_out, pg_in, log):
+    try:
+        filehandle = open(pg_in['conf'], 'r+')
+    except IOError:
+        log.error(
+            'Unable to open postgresql.conf for writing, ' + pg_in['conf'])
+        sys.exit(1)
+    filehandle.close()
+
     for key, value in pg_out.items():
         setting = format_for_pg_conf(value)
-        print(key+": "+str(setting))
-        ret= call(["pg_conftool", pg_in['version'], pg_in['clustername'], "set", key, setting])
+        log.info("set " + key + ": " + str(setting))
+        ret = call(
+            ["pg_conftool", pg_in['version'], pg_in['clustername'], pg_in['conf'], "set", key, setting])
         if ret != 0:
-            log.error("Error while setting: "+key+" to: "+setting+" with return code: "+ret)
+            log.error("Error while setting: " + key +
+                      " to: " + setting + " with return code: " + ret)
+
 
 def main():
     # Configure logging
@@ -241,19 +281,19 @@ def main():
         pg['max_connections'] = -1
 
     # Show information
-    log.info("Variables")
-    log.info("pg_version: " + pg['version'])
-    log.info("pg_clustername: " + pg['clustername'])
-    log.info("pg_conf_dir: " + pg['conf_dir'])
-    log.info("pg_conf: " + pg['conf'])
-    log.info("cpu_count: " + str(system['cpu_count']))
-    log.info("mem: " + str(system['memory']))
+    log.debug("Variables")
+    log.debug("pg_version: " + pg['version'])
+    log.debug("pg_clustername: " + pg['clustername'])
+    log.debug("pg_conf_dir: " + pg['conf_dir'])
+    log.debug("pg_conf: " + pg['conf'])
+    log.debug("cpu_count: " + str(system['cpu_count']))
+    log.debug("mem: " + str(system['memory']))
 
     pg_out = tune(pg, system, log)
 
-    log.info("Result")
-    log.info(pg_out)
-    persist_conf(pg_out,pg, log)
+    log.debug("Result")
+    log.debug(pg_out)
+    persist_conf(pg_out, pg, log)
 
 if __name__ == "__main__":
     main()
