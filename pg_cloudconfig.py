@@ -160,15 +160,11 @@ def superuser_reserved_connections(pg_out, pg_in, system, log):
 
 def autovacuum_max_workers(pg_in, system, log):
     cc = system['cpu_count']
-    amw = 4
-    if cc <= 4:
-        awm = 2
+    amw = 3
     if cc >= 16:
         awm = 5
-    if cc >= 32:
-        amw = 7
     if cc > 64:
-        awm = int(cc * 0.20)
+        amw = 7
     return int(amw)
 
 
@@ -186,7 +182,7 @@ def tune(pg_in, system, log):
     pg_out['checkpoint_completion_target'] = 0.8
     pg_out['min_wal_size'] = "128MB"
     pg_out['max_wal_size'] = "4GB"
-    pg_out['vacuum_cost_limit'] = "400"
+    pg_out['vacuum_cost_limit'] = "600"
 
     # Dynamic setting
     pg_out['shared_buffers'] = shared_buffers(pg_in, system, log)
