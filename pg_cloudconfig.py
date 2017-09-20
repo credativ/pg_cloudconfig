@@ -29,7 +29,8 @@ from datetime import datetime
 from statistics import median
 
 # Global variables
-SUPPORTED_VERSIONS = ['9.6']
+SUPPORTED_VERSIONS = ['10', '9.6']
+DEFAULT_VERSION = SUPPORTED_VERSIONS[0]
 LOG_LEVEL = logging.INFO
 ureg = UnitRegistry()
 Q_ = ureg.Quantity
@@ -291,7 +292,7 @@ def write_bench(file, log):
         return "fast"
 
 
-def tune(pg_in, system, log):
+def tune(pg_in, system, no_static, log):
     """
     Set multiple PostgreSQL settings according to the given input
     """
@@ -302,11 +303,12 @@ def tune(pg_in, system, log):
 
     pg_out = {}
     # Static settings
-    pg_out['wal_level'] = "replica"
-    pg_out['checkpoint_timeout'] = "15min"
-    pg_out['checkpoint_completion_target'] = 0.8
-    pg_out['min_wal_size'] = "128MB"
-    pg_out['max_wal_size'] = "4GB"
+    if not no_static:
+        pg_out['wal_level'] = "replica"
+        pg_out['checkpoint_timeout'] = "15min"
+        pg_out['checkpoint_completion_target'] = 0.8
+        pg_out['min_wal_size'] = "128MB"
+        pg_out['max_wal_size'] = "4GB"
 
     # Dynamic setting
     pg_out['shared_buffers'] = shared_buffers(pg_in, system, log)
@@ -343,7 +345,7 @@ def main():
          This does not tune PostgreSQL for any specific workload but only
          tries to set some optimized defaults based on a few input variables
          and simple rules.""")
-    parser.add_argument('--pg_version', default="9.6",
+    parser.add_argument('--pg_version', default=DEFAULT_VERSION,
                         help='version of the PostgreSQL cluster to tune')
     parser.add_argument('--pg_clustername', default="main",
                         help='name of the PostgreSQL cluster to tune')
@@ -352,7 +354,9 @@ def main():
     parser.add_argument('--pg_conf_dir', default="",
                         help='path to the dir holding the postgresql.conf (only to override default)')
     parser.add_argument(
-        '--debug', action='store_true', help='Show debug output')
+        '--dynamic_only', action='store_true', help='do not set static optimized defaults')
+    parser.add_argument(
+        '--debug', action='store_true', help='show debug messages')
     args = parser.parse_args()
 
     # Configure logging
@@ -399,7 +403,8 @@ def main():
     log.info("Disk was benched as: %s (slow|medium|fast)", pg['disk_speed'])
 
     log.info("Calculate settings...")
-    pg_out = tune(pg, system, log)
+    no_static = args.dynamic_only
+    pg_out = tune(pg, system, no_static, log)
     log.debug("Result")
     log.debug(pg_out)
 
