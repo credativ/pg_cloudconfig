@@ -178,6 +178,7 @@ def autovacuum_max_workers(pg_in, system, log):
         amw = 7
     return int(amw)
 
+
 def vacuum_cost_limit(pg_in, system, log):
     if pg_in['disk_speed'] == "fast":
         return 800
@@ -185,6 +186,7 @@ def vacuum_cost_limit(pg_in, system, log):
         return 600
     elif pg_in['disk_speed'] == "slow":
         return 200
+
 
 def format_for_pg_conf(si):
     if isinstance(si, int) or isinstance(si, str) or isinstance(si, float):
@@ -208,12 +210,12 @@ def persist_conf(pg_out, pg_in, log):
 
     for key, value in sorted(pg_out.items()):
         setting = format_for_pg_conf(value)
-        log.info("set " + key + ": " + str(setting))
+        log.info("set %s: %s", key, setting)
         ret = subprocess.call(
             ["pg_conftool", pg_in['version'], pg_in['clustername'], pg_in['conf'], "set", key, setting])
         if ret != 0:
-            log.error("Error while setting: " + key +
-                      " to: " + setting + " with return code: " + ret)
+            log.error(
+                "Error while setting: %s to: %s with return code: %s", key, setting, ret)
 
 
 def repeat_to_length(string_to_expand, length):
@@ -248,7 +250,7 @@ def write_test(file, log):
             fh = open(file, 'w+')
         except IOError:
             log.error(
-                'Unable to open test file for writing, ' + file)
+                'Unable to open test file for writing, %s', file)
             sys.exit(1)
         fh.write(testdata)
         fh.flush()
@@ -260,7 +262,7 @@ def write_test(file, log):
 
 
 def write_bench(file, log):
-    # Do multiple test runs and Wait some time
+    # Do multiple test runs and wait some time
     # so the test is less likely to run in an anomaly
     results = write_test(file, log)
     time.sleep(0.5)
@@ -269,21 +271,21 @@ def write_bench(file, log):
     results += write_test(file, log)
 
     for i in results:
-        log.debug("test run took " + str(i) + "µs")
+        log.debug("test run took %dµs", i)
     med = int(median(results))
     mean = int(sum(results) / len(results))
-    log.debug("median: " + str(med) + "µs")
-    log.debug("mean: " + str(mean) + "µs")
+    log.debug("median:\t%sµs", med)
+    log.debug("mean:\t%sµs", mean)
 
-    # Example disk
-    # DEBUG - median: 237622
-    # DEBUG - mean:   205075
-    # Example ssd
-    # DEBUG - median:  32335
-    # DEBUG - mean:    35998
+    # Example disk (5400rpm RAID1)
+    # DEBUG - median: 214289µs
+    # DEBUG - mean:   153168µs
+    # Example ssd (NVME Samsung SSD 960 EVO 500GB)
+    # DEBUG - median:  24947µs
+    # DEBUG - mean:    26861µs
     if med > 100000 or mean > 120000:
         return "slow"
-    elif med > 51000 or mean > 61000:
+    elif med > 50000 or mean > 60000:
         return "medium"
     else:
         return "fast"
@@ -294,7 +296,9 @@ def tune(pg_in, system, log):
     Set multiple PostgreSQL settings according to the given input
     """
     if not pg_in['version'] in SUPPORTED_VERSIONS:
-        log.error("Version is not supported, " + pg_in['version'])
+        log.error("Version is not supported: %s", pg_in['version'])
+        log.info("Supported versions: %s", SUPPORTED_VERSIONS)
+        sys.exit(1)
 
     pg_out = {}
     # Static settings
@@ -328,7 +332,17 @@ def main():
 
     # Get cmd arguments
     parser = argparse.ArgumentParser(
-        description='Tool to set optimized defaults for PostgreSQL in cloud environments.')
+        description="""Tool to set optimized defaults for PostgreSQL in virtual environments
+        (changes settings without asking for confirmation).""",
+        epilog="""Should be run as the same user as PostgreSQL.
+        --pg_version and --pg_clustername are used to choose a cluster.
+         It is assumed that the Debian / postgresql-common naming and
+         configuration schema is used.
+         If this is not the case --pg_conf_dir needs to be set.
+         pg_conftool is used to get/set settings and is required!
+         This does not tune PostgreSQL for any specific workload but only
+         tries to set some optimized defaults based on a few input variables
+         and simple rules.""")
     parser.add_argument('--pg_version', default="9.6",
                         help='version of the PostgreSQL cluster to tune')
     parser.add_argument('--pg_clustername', default="main",
@@ -337,13 +351,15 @@ def main():
                         help='set the max_connections explicitly if needed')
     parser.add_argument('--pg_conf_dir', default="",
                         help='path to the dir holding the postgresql.conf (only to override default)')
-    parser.add_argument('--debug', action='store_true', help='Show debug output')
+    parser.add_argument(
+        '--debug', action='store_true', help='Show debug output')
     args = parser.parse_args()
 
     # Configure logging
     if args.debug:
         log_level = logging.DEBUG
-    else: log_level = LOG_LEVEL
+    else:
+        log_level = LOG_LEVEL
 
     log = logging.getLogger('pg_cloudconfig')
     log.setLevel(log_level)
@@ -364,7 +380,7 @@ def main():
 
     # If --pg_conf_dir is set, use it insted of default
     if args.pg_conf_dir > "":
-        pg_conf_dir = args.pg_conf_dir
+        pg['conf_dir'] = args.pg_conf_dir
     pg['conf'] = pg['conf_dir'] + "/postgresql.conf"
 
     if args.max_connections > "":
@@ -372,27 +388,22 @@ def main():
     else:
         pg['max_connections'] = -1
 
+    log.info("Cluster to tune:\t %s/%s", pg['version'], pg['clustername'])
+    log.info("conf_dir:\t %s", pg['conf_dir'])
     pg['data_directory'] = data_directory(pg)
+    log.info("data_directory:\t %s", pg['data_directory'])
 
-    log.info("Start write bench in: " + pg['data_directory'])
+    log.info("Start write_bench...")
     pg['disk_speed'] = write_bench(
         os.path.join(pg['data_directory'], "~write_test.dat"), log)
-    log.info("Disk was benched as: " +
-             pg['disk_speed'] + " (slow|medium|fast)")
+    log.info("Disk was benched as: %s (slow|medium|fast)", pg['disk_speed'])
 
-    # Show information
-    log.debug("Variables")
-    log.debug("pg_version: " + pg['version'])
-    log.debug("pg_clustername: " + pg['clustername'])
-    log.debug("pg_conf_dir: " + pg['conf_dir'])
-    log.debug("pg_conf: " + pg['conf'])
-    log.debug("cpu_count: " + str(system['cpu_count']))
-    log.debug("mem: " + str(system['memory']))
-
+    log.info("Calculate settings...")
     pg_out = tune(pg, system, log)
-
     log.debug("Result")
     log.debug(pg_out)
+
+    log.info("Persist settings using pg_conftool...")
     persist_conf(pg_out, pg, log)
 
 if __name__ == "__main__":
