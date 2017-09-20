@@ -23,12 +23,14 @@ import logging
 import math
 import sys
 import subprocess
+import time
 from pint import UnitRegistry
 from datetime import datetime
 from statistics import median
 
 # Global variables
 SUPPORTED_VERSIONS = ['9.6']
+LOG_LEVEL = logging.INFO
 ureg = UnitRegistry()
 Q_ = ureg.Quantity
 
@@ -204,7 +206,7 @@ def persist_conf(pg_out, pg_in, log):
         sys.exit(1)
     filehandle.close()
 
-    for key, value in pg_out.items():
+    for key, value in sorted(pg_out.items()):
         setting = format_for_pg_conf(value)
         log.info("set " + key + ": " + str(setting))
         ret = subprocess.call(
@@ -240,7 +242,7 @@ def write_test(file, log):
     testdata = repeat_to_length(
         "This is a test string and should be much more random!11!!!1!!!djefoirhnfonndojwpdojawpodjpajdpoajdpaojdpjadpojadoja", (1024 * 1024 * 16))
     runtime = []
-    for i in range(0, 9):
+    for i in range(0, 5):
         startTime = datetime.now()
         try:
             fh = open(file, 'w+')
@@ -258,13 +260,20 @@ def write_test(file, log):
 
 
 def write_bench(file, log):
+    # Do multiple test runs and Wait some time
+    # so the test is less likely to run in an anomaly
     results = write_test(file, log)
+    time.sleep(0.5)
+    results += write_test(file, log)
+    time.sleep(0.5)
+    results += write_test(file, log)
+
     for i in results:
-        log.debug("run took " + str(i))
+        log.debug("test run took " + str(i) + "µs")
     med = int(median(results))
     mean = int(sum(results) / len(results))
-    log.debug("median: " + str(med))
-    log.debug("mean: " + str(mean))
+    log.debug("median: " + str(med) + "µs")
+    log.debug("mean: " + str(mean) + "µs")
 
     # Example disk
     # DEBUG - median: 237622
@@ -274,7 +283,7 @@ def write_bench(file, log):
     # DEBUG - mean:    35998
     if med > 100000 or mean > 120000:
         return "slow"
-    elif med > 50000 or mean > 60000:
+    elif med > 51000 or mean > 61000:
         return "medium"
     else:
         return "fast"
@@ -312,17 +321,6 @@ def tune(pg_in, system, log):
 
 
 def main():
-    # Configure logging
-    log = logging.getLogger('pg_cloudconfig')
-    log.setLevel(logging.DEBUG)
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
-    # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s -
-    # %(message)s')
-    formatter = logging.Formatter('%(levelname)s - %(message)s')
-    ch.setFormatter(formatter)
-    log.addHandler(ch)
-
     # Get system information
     system = {}
     system['cpu_count'] = psutil.cpu_count()
@@ -332,14 +330,30 @@ def main():
     parser = argparse.ArgumentParser(
         description='Tool to set optimized defaults for PostgreSQL in cloud environments.')
     parser.add_argument('--pg_version', default="9.6",
-                        help='Version of the PostgreSQL cluster to tune.')
+                        help='version of the PostgreSQL cluster to tune')
     parser.add_argument('--pg_clustername', default="main",
-                        help='Name of the PostgreSQL cluster to tune.')
+                        help='name of the PostgreSQL cluster to tune')
     parser.add_argument('--max_connections', default="",
-                        help='Set the max_connections explicitly if needed')
+                        help='set the max_connections explicitly if needed')
     parser.add_argument('--pg_conf_dir', default="",
-                        help='Path to the dir holding the postgresql.conf (normally not necessary to set explicitly!).')
+                        help='path to the dir holding the postgresql.conf (only to override default)')
+    parser.add_argument('--debug', action='store_true', help='Show debug output')
     args = parser.parse_args()
+
+    # Configure logging
+    if args.debug:
+        log_level = logging.DEBUG
+    else: log_level = LOG_LEVEL
+
+    log = logging.getLogger('pg_cloudconfig')
+    log.setLevel(log_level)
+    ch = logging.StreamHandler()
+    ch.setLevel(log_level)
+    # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s -
+    # %(message)s')
+    formatter = logging.Formatter('%(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    log.addHandler(ch)
 
     # Settings - set defaults
     pg = {}
