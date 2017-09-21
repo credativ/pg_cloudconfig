@@ -23,33 +23,33 @@ apt-get install postgresql python3-psutil python3-pint
 vagrant up
 vagrant ssh
 sudo su postgres
-pg_cloudconfig
+pg_cloudconfig 9.6 main
 ```
 
 # Usage
 ```
-usage: pg_cloudconfig.py [-h] [--pg_version PG_VERSION]
-                         [--pg_clustername PG_CLUSTERNAME]
-                         [--max_connections MAX_CONNECTIONS]
+usage: pg_cloudconfig.py [-h] [--max_connections MAX_CONNECTIONS]
                          [--pg_conf_dir PG_CONF_DIR] [--dynamic_only]
-                         [--debug]
+                         [--debug] [-q]
+                         pg_version pg_clustername
 
 Tool to set optimized defaults for PostgreSQL in virtual environments (changes
 settings without asking for confirmation).
 
+positional arguments:
+  pg_version            version of the PostgreSQL cluster to tune
+  pg_clustername        name of the PostgreSQL cluster to tune
+
 optional arguments:
   -h, --help            show this help message and exit
-  --pg_version PG_VERSION
-                        version of the PostgreSQL cluster to tune
-  --pg_clustername PG_CLUSTERNAME
-                        name of the PostgreSQL cluster to tune
   --max_connections MAX_CONNECTIONS
                         set the max_connections explicitly if needed
   --pg_conf_dir PG_CONF_DIR
                         path to the dir holding the postgresql.conf (only to
                         override default)
   --dynamic_only        do not set static optimized defaults
-  --debug               Show debug output
+  --debug               show debug messages
+  -q, --quiet           disable output
 
 Should be run as the same user as PostgreSQL. --pg_version and
 --pg_clustername are used to choose a cluster. It is assumed that the Debian /
