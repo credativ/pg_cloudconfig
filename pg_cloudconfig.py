@@ -30,7 +30,6 @@ from statistics import median
 
 # Global variables
 SUPPORTED_VERSIONS = ['10', '9.6']
-DEFAULT_VERSION = SUPPORTED_VERSIONS[1]
 LOG_LEVEL = logging.INFO
 ureg = UnitRegistry()
 Q_ = ureg.Quantity
@@ -286,7 +285,7 @@ def write_bench(file, log):
     # DEBUG - mean:    26861µs
     if med > 100000 or mean > 120000:
         return "slow"
-    elif med > 50000 or mean > 60000:
+    elif med > 40000 or mean > 50000:
         return "medium"
     else:
         return "fast"
@@ -345,9 +344,9 @@ def main():
          This does not tune PostgreSQL for any specific workload but only
          tries to set some optimized defaults based on a few input variables
          and simple rules.""")
-    parser.add_argument('--pg_version', default=DEFAULT_VERSION,
+    parser.add_argument('pg_version', nargs=1,
                         help='version of the PostgreSQL cluster to tune')
-    parser.add_argument('--pg_clustername', default="main",
+    parser.add_argument('pg_clustername', nargs=1,
                         help='name of the PostgreSQL cluster to tune')
     parser.add_argument('--max_connections', default="",
                         help='set the max_connections explicitly if needed')
@@ -357,11 +356,15 @@ def main():
         '--dynamic_only', action='store_true', help='do not set static optimized defaults')
     parser.add_argument(
         '--debug', action='store_true', help='show debug messages')
+    parser.add_argument(
+        '-q', '--quiet', action='store_true', help='disable output')
     args = parser.parse_args()
 
     # Configure logging
     if args.debug:
         log_level = logging.DEBUG
+    elif args.quiet:
+        log_level = logging.FATAL
     else:
         log_level = LOG_LEVEL
 
@@ -377,15 +380,17 @@ def main():
 
     # Settings - set defaults
     pg = {}
-    pg['version'] = args.pg_version
-    pg['clustername'] = args.pg_clustername
-    pg['conf_dir'] = "/etc/postgresql/" + \
-        pg['version'] + "/" + pg['clustername']
+    pg['version'] = args.pg_version[0]
+    pg['clustername'] = args.pg_clustername[0]
 
     # If --pg_conf_dir is set, use it insted of default
     if args.pg_conf_dir > "":
-        pg['conf_dir'] = args.pg_conf_dir
-    pg['conf'] = pg['conf_dir'] + "/postgresql.conf"
+        pg['conf_dir'] = os.path.join(
+            args.pg_conf_dir, pg['conf'], pg['conf_dir'], "postgresql.conf")
+    else:
+        pg['conf_dir'] = os.path.join(
+        "/etc/postgresql", pg['version'], pg['clustername'])
+    pg['conf'] = os.path.join(pg['conf_dir'], "postgresql.conf")
 
     if args.max_connections > "":
         pg['max_connections'] = args.max_connections
