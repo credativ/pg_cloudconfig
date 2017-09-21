@@ -209,13 +209,16 @@ def persist_conf(pg_out, pg_in, log):
     filehandle.close()
 
     for key, value in sorted(pg_out.items()):
-        setting = format_for_pg_conf(value)
-        log.info("set %s: %s", key, setting)
-        ret = subprocess.call(
-            ["pg_conftool", pg_in['version'], pg_in['clustername'], pg_in['conf'], "set", key, setting])
-        if ret != 0:
-            log.error(
-                "Error while setting: %s to: %s with return code: %s", key, setting, ret)
+        if key in pg_in['blacklist']:
+            log.info("blacklisted and will not be changed: %s", key)
+        else:
+            setting = format_for_pg_conf(value)
+            log.info("set %s: %s", key, setting)
+            ret = subprocess.call(
+                ["pg_conftool", pg_in['version'], pg_in['clustername'], pg_in['conf'], "set", key, setting])
+            if ret != 0:
+                log.error(
+                    "Error while setting: %s to: %s with return code: %s", key, setting, ret)
 
 
 def repeat_to_length(string_to_expand, length):
@@ -355,6 +358,8 @@ def main():
     parser.add_argument(
         '--dynamic_only', action='store_true', help='do not set static optimized defaults')
     parser.add_argument(
+        '--blacklist', nargs='+', default=[], metavar='SETTING', help='settings not to touch')
+    parser.add_argument(
         '--debug', action='store_true', help='show debug messages')
     parser.add_argument(
         '-q', '--quiet', action='store_true', help='disable output')
@@ -378,10 +383,11 @@ def main():
     ch.setFormatter(formatter)
     log.addHandler(ch)
 
-    # Settings - set defaults
+    # Settings
     pg = {}
     pg['version'] = args.pg_version[0]
     pg['clustername'] = args.pg_clustername[0]
+    pg['blacklist'] = args.blacklist
 
     # If --pg_conf_dir is set, use it insted of default
     if args.pg_conf_dir > "":
@@ -389,7 +395,7 @@ def main():
             args.pg_conf_dir, pg['conf'], pg['conf_dir'], "postgresql.conf")
     else:
         pg['conf_dir'] = os.path.join(
-        "/etc/postgresql", pg['version'], pg['clustername'])
+            "/etc/postgresql", pg['version'], pg['clustername'])
     pg['conf'] = os.path.join(pg['conf_dir'], "postgresql.conf")
 
     if args.max_connections > "":

@@ -30,7 +30,7 @@ pg_cloudconfig 9.6 main
 ```
 usage: pg_cloudconfig [-h] [--max_connections MAX_CONNECTIONS]
                       [--pg_conf_dir PG_CONF_DIR] [--dynamic_only]
-                      [--debug] [-q]
+                      [--blacklist SETTING [SETTING ...]] [--debug] [-q]
                       pg_version pg_clustername
 
 Tool to set optimized defaults for PostgreSQL in virtual environments (changes
@@ -48,6 +48,8 @@ optional arguments:
                         path to the dir holding the postgresql.conf (only to
                         override default)
   --dynamic_only        do not set static optimized defaults
+  --blacklist SETTING [SETTING ...]
+                        settings not to touch
   --debug               show debug messages
   -q, --quiet           disable output
 
@@ -61,5 +63,4 @@ simple rules.
 ```
 
 # Planed Features
-* Blacklist for values not to change
 * List with parameters to set to a given value
