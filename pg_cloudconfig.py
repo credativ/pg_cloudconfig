@@ -30,7 +30,7 @@ from statistics import median
 
 # Global variables
 SUPPORTED_VERSIONS = ['10', '9.6']
-DEFAULT_VERSION = SUPPORTED_VERSIONS[0]
+DEFAULT_VERSION = SUPPORTED_VERSIONS[1]
 LOG_LEVEL = logging.INFO
 ureg = UnitRegistry()
 Q_ = ureg.Quantity
