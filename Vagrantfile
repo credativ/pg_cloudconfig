@@ -67,6 +67,6 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", inline: <<-SHELL
      apt-get update
      apt-get install -y postgresql python3-psutil python3-pint
-     ln -s /vagrant/pg_cloudconfig.py /bin/pg_cloudconfig
+     ln -s /vagrant/pg_cloudconfig /bin/pg_cloudconfig
   SHELL
 end

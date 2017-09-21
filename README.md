@@ -28,10 +28,10 @@ pg_cloudconfig 9.6 main
 
 # Usage
 ```
-usage: pg_cloudconfig.py [-h] [--max_connections MAX_CONNECTIONS]
-                         [--pg_conf_dir PG_CONF_DIR] [--dynamic_only]
-                         [--debug] [-q]
-                         pg_version pg_clustername
+usage: pg_cloudconfig [-h] [--max_connections MAX_CONNECTIONS]
+                      [--pg_conf_dir PG_CONF_DIR] [--dynamic_only]
+                      [--debug] [-q]
+                      pg_version pg_clustername
 
 Tool to set optimized defaults for PostgreSQL in virtual environments (changes
 settings without asking for confirmation).
@@ -59,3 +59,7 @@ and is required! This does not tune PostgreSQL for any specific workload but
 only tries to set some optimized defaults based on a few input variables and
 simple rules.
 ```
+
+# Planed Features
+* Blacklist for values not to change
+* List with parameters to set to a given value
