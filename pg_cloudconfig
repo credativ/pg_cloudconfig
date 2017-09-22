@@ -28,9 +28,13 @@ from pint import UnitRegistry
 from datetime import datetime
 from statistics import median
 
+
 # Global variables
+VERSION = 0.1
 SUPPORTED_VERSIONS = ['10', '9.6']
 LOG_LEVEL = logging.INFO
+
+# SI unit usage
 ureg = UnitRegistry()
 Q_ = ureg.Quantity
 
@@ -245,7 +249,9 @@ def data_directory(pg):
 
 def write_test(file, log):
     testdata = repeat_to_length(
-        "This is a test string and should be much more random!11!!!1!!!djefoirhnfonndojwpdojawpodjpajdpoajdpaojdpjadpojadoja", (1024 * 1024 * 16))
+        """This is a test string and should be much more random
+        !11!!!1!!!djefoirhnfonndojwpdojawpodjpajdpoajdpaojdpjadpojadoja""",
+        (1024 * 1024 * 16))
     runtime = []
     for i in range(0, 5):
         startTime = datetime.now()
@@ -324,7 +330,6 @@ def tune(pg_in, system, no_static, log):
     pg_out['autovacuum_max_workers'] = autovacuum_max_workers(
         pg_in, system, log)
     pg_out['vacuum_cost_limit'] = vacuum_cost_limit(pg_in, system, log)
-
     return pg_out
 
 
@@ -363,6 +368,8 @@ def main():
         '--debug', action='store_true', help='show debug messages')
     parser.add_argument(
         '-q', '--quiet', action='store_true', help='disable output')
+    parser.add_argument('--version', action='version',
+                        version='%(prog)s {version}'.format(version=VERSION))
     args = parser.parse_args()
 
     # Configure logging

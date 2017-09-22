@@ -31,6 +31,7 @@ pg_cloudconfig 9.6 main
 usage: pg_cloudconfig [-h] [--max_connections MAX_CONNECTIONS]
                       [--pg_conf_dir PG_CONF_DIR] [--dynamic_only]
                       [--blacklist SETTING [SETTING ...]] [--debug] [-q]
+                      [--version]
                       pg_version pg_clustername
 
 Tool to set optimized defaults for PostgreSQL in virtual environments (changes
@@ -52,6 +53,7 @@ optional arguments:
                         settings not to touch
   --debug               show debug messages
   -q, --quiet           disable output
+  --version             show program's version number and exit
 
 Should be run as the same user as PostgreSQL. --pg_version and
 --pg_clustername are used to choose a cluster. It is assumed that the Debian /
@@ -62,5 +64,5 @@ only tries to set some optimized defaults based on a few input variables and
 simple rules.
 ```
 
-# Planed Features
+# Planned Features
 * List with parameters to set to a given value
