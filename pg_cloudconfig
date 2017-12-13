@@ -29,7 +29,7 @@ from statistics import median
 import psutil
 from pint import UnitRegistry
 # Global variables
-VERSION = 0.1
+VERSION = 0.2
 SUPPORTED_VERSIONS = ['10', '9.6']
 LOG_LEVEL = logging.INFO
 
