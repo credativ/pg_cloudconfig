@@ -281,7 +281,7 @@ def write_test(testfile, log):
             fh = open(testfile, 'w+')
         except IOError:
             log.error('Iteration %d Unable to open test file for writing, %s',
-                      i, file)
+                      i, testfile)
             sys.exit(1)
         fh.write(testdata)
         fh.flush()
@@ -387,8 +387,7 @@ def main():
     parser.add_argument(
         '--pg_conf_dir',
         default="",
-        help='path to the dir holding the postgresql.conf (only to override default)'
-    )
+        help='path to dir holding the postgresql.conf (to override default)')
     parser.add_argument(
         '--dynamic_only',
         action='store_true',
