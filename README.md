@@ -15,7 +15,8 @@ and simple rules.
 # Installation
 ## Debian / Ubuntu
 ```bash
-apt-get install postgresql python3-psutil python3-pint
+sudo apt-get install postgresql python3-psutil python3-pint
+sudo cp pg_cloudconfig /usr/local/bin
 ```
 
 # Test
@@ -63,6 +64,3 @@ and is required! This does not tune PostgreSQL for any specific workload but
 only tries to set some optimized defaults based on a few input variables and
 simple rules.
 ```
-
-# Planned Features
-* List with parameters to set to a given value
