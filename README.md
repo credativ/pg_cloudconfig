@@ -4,7 +4,7 @@ Tool to set optimized defaults for PostgreSQL in virtual environments (changes s
 
 Should be run as the same user as PostgreSQL.
 `pg_version` and `pg_clustername` are used to choose a cluster.
-It is assumed that the Debian / postgresql-common naming and
+It is assumed that the Debian (postgresql-common) naming and
 configuration schema is used.
 If this is not the case `--pg_conf_dir` needs to be set.
 pg_conftool is used to get/set settings and is required!
@@ -12,12 +12,23 @@ This does not tune PostgreSQL for any specific workload but only
 tries to set some optimized defaults based on a few input variables
 and simple rules.
 
+## Disclaimer
+It's intended use is to pre-configure automatic created cloud instances.
+For high load and critical databases it should always be preferred to configure and tune them for the specific use case.
+
 # Installation
 ## Debian / Ubuntu
 ```bash
-sudo apt-get install postgresql python3-psutil python3-pint
+sudo apt-get install postgresql-common python3-psutil python3-pint
 sudo cp pg_cloudconfig /usr/local/bin
 ```
+
+## Other
+The following dependencies are required
+* [postgresql-common](https://anonscm.debian.org/cgit/pkg-postgresql/postgresql-common.git/)
+* python3
+* python3-psutil
+* python3-pint
 
 # Test
 ```bash
@@ -63,4 +74,10 @@ common naming and configuration schema is used. If this is not the case
 required! This does not tune PostgreSQL for any specific workload but only
 tries to set some optimized defaults based on a few input variables and simple
 rules.
+```
+
+## Example
+
+```bash
+pg_cloudconfig 10 main
 ```
