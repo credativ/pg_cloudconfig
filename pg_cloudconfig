@@ -19,17 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
 import argparse
-import psutil
 import logging
 import math
 import sys
-import subprocess
 import time
-from pint import UnitRegistry
+import subprocess
 from datetime import datetime
 from statistics import median
-
-
+import psutil
+from pint import UnitRegistry
 # Global variables
 VERSION = 0.1
 SUPPORTED_VERSIONS = ['10', '9.6']
@@ -41,9 +39,7 @@ Q_ = ureg.Quantity
 
 
 def memory():
-    """
-    Get node total memory and memory usage
-    """
+    """Get node total memory and memory usage"""
     with open('/proc/meminfo', 'r') as meminfo:
         mem = {}
         free = 0
@@ -59,27 +55,31 @@ def memory():
 
 
 def round_power_of_2_ceil(number):
+    """Round number up to the power of 2"""
     return int(math.pow(2, math.ceil(math.log(number, 2))))
 
 
 def round_power_of_2_ceil_mb(mem):
+    """Round memory up to the power of 2 and return in MB"""
     mem_mb = mem.to(ureg.megabyte).magnitude
     ceil_mb = int(math.pow(2, math.ceil(math.log(mem_mb, 2))))
     return ceil_mb * ureg.megabyte
 
 
 def round_power_of_2_floor(number):
+    """Round number down to the power of 2"""
     return int(math.pow(2, math.floor(math.log(number, 2))))
 
 
 def round_power_of_2_floor_mb(mem):
+    """Round memory down to the power of 2 and return in MB"""
     mem_mb = mem.to(ureg.megabyte).magnitude
     floor_mb = int(math.pow(2, math.floor(math.log(mem_mb, 2))))
     return floor_mb * ureg.megabyte
 
 
-def shared_buffers(pg_in, system, log):
-    # Get total available memory as MB
+def shared_buffers(system):
+    """Calculate the shared_buffers"""
     total = system['memory']['total']
 
     # Get a candidate value
@@ -105,7 +105,8 @@ def shared_buffers(pg_in, system, log):
     return round_power_of_2_floor_mb(sb)
 
 
-def maintenance_work_mem(pg_in, system, log):
+def maintenance_work_mem(system):
+    """Calculate the maintenance_work_mem"""
     # Get total available memory as MB
     total = system['memory']['total']
 
@@ -120,7 +121,8 @@ def maintenance_work_mem(pg_in, system, log):
     return round_power_of_2_floor_mb(mwm)
 
 
-def max_connections(pg_out, pg_in, system, log):
+def max_connections(pg_out, pg_in, system):
+    """Calculate the max_connections"""
     # If max_connections are given we use it
     if pg_in['max_connections'] > 0:
         return pg_in['max_connections']
@@ -130,11 +132,11 @@ def max_connections(pg_out, pg_in, system, log):
 
     connection_ram = system['memory']['total'].to(ureg.megabyte).magnitude
     # keep some space for the OS fs cache
-    connection_ram -= system['memory'][
-        'total'].to(ureg.megabyte).magnitude / 10
+    connection_ram -= system['memory']['total'].to(
+        ureg.megabyte).magnitude / 10
     connection_ram -= pg_out['shared_buffers'].to(ureg.megabyte).magnitude
-    connection_ram -= pg_out[
-        'maintenance_work_mem'].to(ureg.megabyte).magnitude
+    connection_ram -= pg_out['maintenance_work_mem'].to(
+        ureg.megabyte).magnitude
 
     # Estimate possible workmem
     workmem_candidate = round_power_of_2_floor(connection_ram / cpu_candidate)
@@ -143,20 +145,22 @@ def max_connections(pg_out, pg_in, system, log):
     return int(round(connection_ram / workmem_candidate, -1))
 
 
-def work_mem(pg_out, pg_in, system, log):
+def work_mem(pg_out, system):
+    """Calculate the work_mem"""
     connection_ram = system['memory']['total']
     connection_ram -= pg_out['shared_buffers']
     connection_ram -= pg_out['maintenance_work_mem']
-    return round_power_of_2_floor_mb(connection_ram / pg_out['max_connections'])
+    return round_power_of_2_floor_mb(connection_ram /
+                                     pg_out['max_connections'])
 
 
-def effective_cache_size(pg_out, pg_in, system, log):
+def effective_cache_size(pg_out, pg_in, system):
+    """Calculate the effective_cache_size"""
     usage_factor = 0.6
     cache_ram = system['memory']['total']
     cache_ram -= pg_out['shared_buffers']
     cache_ram -= pg_out['maintenance_work_mem']
-    cache_ram -= pg_out['work_mem'] * pg_out[
-        'max_connections'] * usage_factor
+    cache_ram -= pg_out['work_mem'] * pg_out['max_connections'] * usage_factor
 
     # If we are running on fast SSDs we can assume a larger cash
     # to push PostgreSQL to do less sequential scans
@@ -166,7 +170,8 @@ def effective_cache_size(pg_out, pg_in, system, log):
     return round_power_of_2_floor_mb(cache_ram)
 
 
-def superuser_reserved_connections(pg_out, pg_in, system, log):
+def superuser_reserved_connections(pg_out):
+    """Calculate the superuser_reserved_connections"""
     src = 7
     if pg_out['max_connections'] <= (src * 30):
         src = 5
@@ -175,17 +180,19 @@ def superuser_reserved_connections(pg_out, pg_in, system, log):
     return src
 
 
-def autovacuum_max_workers(pg_in, system, log):
+def autovacuum_max_workers(system):
+    """Calculate the autovacuum_max_workers"""
     cc = system['cpu_count']
-    amw = 3
+    avmw = 3
     if cc >= 16:
-        awm = 5
+        avmw = 5
     if cc > 64:
-        amw = 7
-    return int(amw)
+        avmw = 7
+    return int(avmw)
 
 
-def vacuum_cost_limit(pg_in, system, log):
+def vacuum_cost_limit(pg_in):
+    """Calculate the vacuum_cost_limit"""
     if pg_in['disk_speed'] == "fast":
         return 800
     elif pg_in['disk_speed'] == "medium":
@@ -195,6 +202,7 @@ def vacuum_cost_limit(pg_in, system, log):
 
 
 def format_for_pg_conf(si):
+    """Format values to a string representation for the postgresql.conf"""
     if isinstance(si, int) or isinstance(si, str) or isinstance(si, float):
         # Seams to be a basic type so we just return the value as string
         return str(si)
@@ -206,11 +214,12 @@ def format_for_pg_conf(si):
 
 
 def persist_conf(pg_out, pg_in, log):
+    """Persit all not blacklisted settings form pg_out to the config file"""
     try:
         filehandle = open(pg_in['conf'], 'r+')
     except IOError:
-        log.error(
-            'Unable to open postgresql.conf for writing, ' + pg_in['conf'])
+        log.error('Unable to open postgresql.conf for writing, ' +
+                  pg_in['conf'])
         sys.exit(1)
     filehandle.close()
 
@@ -220,18 +229,24 @@ def persist_conf(pg_out, pg_in, log):
         else:
             setting = format_for_pg_conf(value)
             log.info("set %s: %s", key, setting)
-            ret = subprocess.call(
-                ["pg_conftool", pg_in['version'], pg_in['clustername'], pg_in['conf'], "set", key, setting])
+            ret = subprocess.call([
+                "pg_conftool", pg_in['version'], pg_in['clustername'],
+                pg_in['conf'], "set", key, setting
+            ])
             if ret != 0:
                 log.error(
-                    "Error while setting: %s to: %s with return code: %s", key, setting, ret)
+                    "Error while setting: %s to: %s with return code: %s", key,
+                    setting, ret)
 
 
 def repeat_to_length(string_to_expand, length):
-    return (string_to_expand * int((length / len(string_to_expand)) + 1))[:length]
+    """Repeat a string (partial) to a given length"""
+    return (string_to_expand *
+            int((length / len(string_to_expand)) + 1))[:length]
 
 
 def chomp(x):
+    """Removes the last character of a string if it is a newline"""
     if x.endswith("\r\n"):
         return x[:-2]
     if x.endswith("\n"):
@@ -239,17 +254,22 @@ def chomp(x):
     return x
 
 
-def show_setting(pg, key):
-    ret = (subprocess.check_output(
-        ["pg_conftool", "--short", pg['version'], pg['clustername'], pg['conf'], "show", key]))
+def get_setting(pg, key):
+    """Gets a setting via pg_conftool"""
+    ret = (subprocess.check_output([
+        "pg_conftool", "--short", pg['version'], pg['clustername'], pg['conf'],
+        "show", key
+    ]))
     return chomp(ret.decode('UTF-8'))
 
 
 def data_directory(pg):
-    return show_setting(pg, "data_directory")
+    """Returns the data_directory"""
+    return get_setting(pg, "data_directory")
 
 
-def write_test(file, log):
+def write_test(testfile, log):
+    """Performs a test write of 5 times 16MB and returns the needed time"""
     testdata = repeat_to_length(
         """This is a test string and should be much more random
         !11!!!1!!!djefoirhnfonndojwpdojawpodjpajdpoajdpaojdpjadpojadoja""",
@@ -258,28 +278,29 @@ def write_test(file, log):
     for i in range(0, 5):
         startTime = datetime.now()
         try:
-            fh = open(file, 'w+')
+            fh = open(testfile, 'w+')
         except IOError:
-            log.error(
-                'Unable to open test file for writing, %s', file)
+            log.error('Iteration %d Unable to open test file for writing, %s',
+                      i, file)
             sys.exit(1)
         fh.write(testdata)
         fh.flush()
         fh.close()
         delta = datetime.now() - startTime
         runtime.append(delta.microseconds)
-    os.remove(file)
+    os.remove(testfile)
     return runtime
 
 
-def write_bench(file, log):
+def write_bench(testfile, log):
+    """Estimates the write performance (slow|medium|fast)"""
     # Do multiple test runs and wait some time
     # so the test is less likely to run in an anomaly
-    results = write_test(file, log)
+    results = write_test(testfile, log)
     time.sleep(0.5)
-    results += write_test(file, log)
+    results += write_test(testfile, log)
     time.sleep(0.5)
-    results += write_test(file, log)
+    results += write_test(testfile, log)
 
     for i in results:
         log.debug("test run took %dµs", i)
@@ -303,9 +324,7 @@ def write_bench(file, log):
 
 
 def tune(pg_in, system, no_static, log):
-    """
-    Set multiple PostgreSQL settings according to the given input
-    """
+    """Set multiple PostgreSQL settings according to the given input"""
     if not pg_in['version'] in SUPPORTED_VERSIONS:
         log.error("Version is not supported: %s", pg_in['version'])
         log.info("Supported versions: %s", SUPPORTED_VERSIONS)
@@ -321,22 +340,21 @@ def tune(pg_in, system, no_static, log):
         pg_out['max_wal_size'] = "4GB"
 
     # Dynamic setting
-    pg_out['shared_buffers'] = shared_buffers(pg_in, system, log)
-    pg_out['maintenance_work_mem'] = maintenance_work_mem(pg_in, system, log)
-    pg_out['max_connections'] = max_connections(pg_out, pg_in, system, log)
-    pg_out['work_mem'] = work_mem(pg_out, pg_in, system, log)
-    pg_out['effective_cache_size'] = effective_cache_size(
-        pg_out, pg_in, system, log)
+    pg_out['shared_buffers'] = shared_buffers(system)
+    pg_out['maintenance_work_mem'] = maintenance_work_mem(system)
+    pg_out['max_connections'] = max_connections(pg_out, pg_in, system)
+    pg_out['work_mem'] = work_mem(pg_out, system)
+    pg_out['effective_cache_size'] = effective_cache_size(pg_out, pg_in,
+                                                          system)
     pg_out['superuser_reserved_connections'] = superuser_reserved_connections(
-        pg_out, pg_in, system, log)
-    pg_out['autovacuum_max_workers'] = autovacuum_max_workers(
-        pg_in, system, log)
-    pg_out['vacuum_cost_limit'] = vacuum_cost_limit(pg_in, system, log)
+        pg_out)
+    pg_out['autovacuum_max_workers'] = autovacuum_max_workers(system)
+    pg_out['vacuum_cost_limit'] = vacuum_cost_limit(pg_in)
     return pg_out
 
 
 def main():
-    # Get system information
+    """Main function ;)"""
     system = {}
     system['cpu_count'] = psutil.cpu_count()
     system['memory'] = memory()
@@ -354,24 +372,41 @@ def main():
          This does not tune PostgreSQL for any specific workload but only
          tries to set some optimized defaults based on a few input variables
          and simple rules.""")
-    parser.add_argument('pg_version', nargs=1,
-                        help='version of the PostgreSQL cluster to tune')
-    parser.add_argument('pg_clustername', nargs=1,
-                        help='name of the PostgreSQL cluster to tune')
-    parser.add_argument('--max_connections', default="",
-                        help='set the max_connections explicitly if needed')
-    parser.add_argument('--pg_conf_dir', default="",
-                        help='path to the dir holding the postgresql.conf (only to override default)')
     parser.add_argument(
-        '--dynamic_only', action='store_true', help='do not set static optimized defaults')
+        'pg_version',
+        nargs=1,
+        help='version of the PostgreSQL cluster to tune')
     parser.add_argument(
-        '--blacklist', nargs='+', default=[], metavar='SETTING', help='settings not to touch')
+        'pg_clustername',
+        nargs=1,
+        help='name of the PostgreSQL cluster to tune')
+    parser.add_argument(
+        '--max_connections',
+        default="",
+        help='set the max_connections explicitly if needed')
+    parser.add_argument(
+        '--pg_conf_dir',
+        default="",
+        help='path to the dir holding the postgresql.conf (only to override default)'
+    )
+    parser.add_argument(
+        '--dynamic_only',
+        action='store_true',
+        help='do not set static optimized defaults')
+    parser.add_argument(
+        '--blacklist',
+        nargs='+',
+        default=[],
+        metavar='SETTING',
+        help='settings not to touch')
     parser.add_argument(
         '--debug', action='store_true', help='show debug messages')
     parser.add_argument(
         '-q', '--quiet', action='store_true', help='disable output')
-    parser.add_argument('--version', action='version',
-                        version='%(prog)s {version}'.format(version=VERSION))
+    parser.add_argument(
+        '--version',
+        action='version',
+        version='%(prog)s {version}'.format(version=VERSION))
     args = parser.parse_args()
 
     # Configure logging
@@ -400,11 +435,11 @@ def main():
 
     # If --pg_conf_dir is set, use it insted of default
     if args.pg_conf_dir > "":
-        pg['conf_dir'] = os.path.join(
-            args.pg_conf_dir, pg['conf'], pg['conf_dir'], "postgresql.conf")
+        pg['conf_dir'] = os.path.join(args.pg_conf_dir, pg['conf'],
+                                      pg['conf_dir'], "postgresql.conf")
     else:
-        pg['conf_dir'] = os.path.join(
-            "/etc/postgresql", pg['version'], pg['clustername'])
+        pg['conf_dir'] = os.path.join("/etc/postgresql", pg['version'],
+                                      pg['clustername'])
     pg['conf'] = os.path.join(pg['conf_dir'], "postgresql.conf")
 
     if args.max_connections > "":
@@ -430,6 +465,7 @@ def main():
 
     log.info("Persist settings using pg_conftool...")
     persist_conf(pg_out, pg, log)
+
 
 if __name__ == "__main__":
     main()
