@@ -364,7 +364,7 @@ def main():
         description="""Tool to set optimized defaults for PostgreSQL in virtual environments
         (changes settings without asking for confirmation).""",
         epilog="""Should be run as the same user as PostgreSQL.
-        --pg_version and --pg_clustername are used to choose a cluster.
+        pg_version and pg_clustername are used to choose a cluster.
          It is assumed that the Debian / postgresql-common naming and
          configuration schema is used.
          If this is not the case --pg_conf_dir needs to be set.
