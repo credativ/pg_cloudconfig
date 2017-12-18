@@ -116,6 +116,12 @@ def main():
 
     log.info("Cluster to tune:\t %s/%s", pg['version'], pg['clustername'])
     log.info("conf_dir:\t %s", pg['conf_dir'])
+
+    if not os.path.isdir(pg['conf_dir']):
+        log.error("conf_dir (%s) is not a directory or does not exist", pg['conf_dir'])
+        log.info("Hint: Does the cluster %s/%s exists? Try 'pg_createcluster %s %s' if not.", pg['version'], pg['clustername'], pg['version'], pg['clustername'])
+        sys.exit(1)
+
     pg['data_directory'] = data_directory(pg)
     log.info("data_directory:\t %s", pg['data_directory'])
 
