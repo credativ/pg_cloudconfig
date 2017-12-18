@@ -2,7 +2,7 @@
 from setuptools import find_packages, setup
 
 setup(
-    name='pg_cloudconifg',
+    name='pg_cloudconfig',
     version='0.3',
     license='GPL3',
     author='Alexander Sosna',
