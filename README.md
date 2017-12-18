@@ -1,3 +1,5 @@
+![pg_cloudconfig logo](images/pg_cloudconfig.png "pg_cloudconfig")
+
 # Intro pg_cloudconfig
 Tool to set optimized defaults for PostgreSQL in virtual environments (changes settings without asking for confirmation).
 
