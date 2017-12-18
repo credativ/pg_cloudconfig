@@ -21,7 +21,7 @@ For high load and critical databases it should always be preferred to configure 
 # Installation
 ## Debian / Ubuntu
 ```bash
-sudo apt-get install postgresql-common python3-psutil python3-pint setuptools
+sudo apt-get install postgresql-common python3-pint python3-setuptools
 python3 setup.py build
 sudo python3 setup.py install
 ```
@@ -30,8 +30,8 @@ sudo python3 setup.py install
 The following dependencies are required
 * [postgresql-common](https://anonscm.debian.org/cgit/pkg-postgresql/postgresql-common.git/)
 * python3
-* python3-psutil
 * python3-pint
+* python3-setuptools
 
 # Test
 ```bash
