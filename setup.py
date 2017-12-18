@@ -13,7 +13,6 @@ setup(
     zip_safe=False,
     platforms='any',
     install_requires=[
-        'datetime',
         'pint',
     ],
     entry_points={
