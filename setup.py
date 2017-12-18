@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='pg_cloudconifg',
-    version='0.2',
+    version='0.3',
     license='GPL3',
     author='Alexander Sosna',
     author_email='alexander.sosna@credativ.de',

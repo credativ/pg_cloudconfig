@@ -27,7 +27,7 @@ from datetime import datetime
 from statistics import median
 from pint import UnitRegistry
 # Global variables
-VERSION = 0.2
+VERSION = 0.3
 SUPPORTED_VERSIONS = ['10', '9.6']
 LOG_LEVEL = logging.INFO
 

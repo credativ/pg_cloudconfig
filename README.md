@@ -19,8 +19,9 @@ For high load and critical databases it should always be preferred to configure 
 # Installation
 ## Debian / Ubuntu
 ```bash
-sudo apt-get install postgresql-common python3-psutil python3-pint
-sudo cp pg_cloudconfig /usr/local/bin
+sudo apt-get install postgresql-common python3-psutil python3-pint setuptools
+python3 setup.py build
+sudo python3 setup.py install
 ```
 
 ## Other
