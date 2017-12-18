@@ -8,9 +8,10 @@ setup(
     author='Alexander Sosna',
     author_email='alexander.sosna@credativ.de',
     description='Tool to set optimized defaults for PostgreSQL in virtual environments.',
-    # long_description=readme,
+    keywords = "postgres postgresql tune tuning cloud",
+    url = "https://github.com/credativ/pg_cloudconfig",
     packages=find_packages(exclude=('tests','doc',)),
-    zip_safe=False,
+    zip_safe=True,
     platforms='any',
     install_requires=[
         'pint',
