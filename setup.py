@@ -13,6 +13,12 @@ setup(
     packages=find_packages(exclude=('tests','doc',)),
     zip_safe=True,
     platforms='any',
+    classifiers=[
+    'Development Status :: 4 - Beta',
+    'Intended Audience :: System Administrators',
+    'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
+    'Programming Language :: Python :: 3'
+    ],
     install_requires=[
         'pint',
     ],
