@@ -31,6 +31,11 @@ from pint import UnitRegistry
 __version__ = '0.5'
 VERSION = __version__
 SUPPORTED_VERSIONS = ['10', '9.6']
+TOOLS = [[
+    'This tool is needed to read and write PostgreSQL Settings',
+    ['pg_conftool', '--help']
+]]
+
 LOG_LEVEL = logging.INFO
 
 # SI unit usage
@@ -218,8 +223,8 @@ def persist_conf(pg_out, pg_in, log):
     try:
         filehandle = open(pg_in['conf'], 'r+')
     except IOError:
-        log.error('Unable to open postgresql.conf for writing, ' +
-                  pg_in['conf'])
+        log.error(
+            'Unable to open postgresql.conf for writing, ' + pg_in['conf'])
         sys.exit(1)
     filehandle.close()
 
@@ -361,8 +366,8 @@ def main():
 
     # Get cmd arguments
     parser = argparse.ArgumentParser(
-        description=
-        """Tool to set optimized defaults for PostgreSQL in virtual environments
+        description="""Tool to set optimized defaults for PostgreSQL
+        in virtual environments
         (changes settings without asking for confirmation).""",
         epilog="""Should be run as the same user as PostgreSQL.
         pg_version and pg_clustername are used to choose a cluster.
@@ -453,13 +458,33 @@ def main():
     if not os.path.isdir(pg['conf_dir']):
         log.error("conf_dir (%s) is not a directory or does not exist",
                   pg['conf_dir'])
-        log.info(
-            "Hint: Does the cluster %s/%s exists? Try 'pg_createcluster %s %s' if not.",
-            pg['version'], pg['clustername'], pg['version'], pg['clustername'])
+        log.info("Hint: Does the cluster %s/%s exists?" +
+                 "Try 'pg_createcluster %s %s' if not.", pg['version'],
+                 pg['clustername'], pg['version'], pg['clustername'])
         sys.exit(1)
 
     pg['data_directory'] = data_directory(pg)
     log.info("data_directory:\t %s", pg['data_directory'])
+
+    # Check if needed tools are available
+    log.debug("Checking tools")
+    tool_fails = 0
+    DEVNULL = open(os.devnull, 'w')
+    for tool in TOOLS:
+        helptext = tool[0]
+        command = tool[1]
+        name = command[0]
+        try:
+            ret = subprocess.call(command, stdout=DEVNULL)
+        except FileNotFoundError:
+            ret = -1
+        if ret != 0:
+            tool_fails += 1
+            log.error("It seems the tool '%s' is not working correctly." +
+                      " Is it installed and in the path?", name)
+            log.info("Why '%s' is needed: %s", name, helptext)
+        if tool_fails != 0:
+            sys.exit(1)
 
     log.info("Start write_bench...")
     pg['disk_speed'] = write_bench(
