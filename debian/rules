@@ -1,0 +1,15 @@
+#!/usr/bin/make -f
+
+export PYBUILD_NAME=pg-cloudconfig
+
+override_dh_installman:
+	PATH=$(PATH):$(CURDIR)/debian/pg-cloudconfig/usr/bin \
+	PYTHONPATH=$(CURDIR) \
+	help2man --no-discard-stderr --no-info \
+		--name "set optimized defaults for PostgreSQL in virtualized environments" \
+		--version-string=$(shell dpkg-parsechangelog -S Version) \
+		pg_cloudconfig > pg_cloudconfig.1
+	dh_installman
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild

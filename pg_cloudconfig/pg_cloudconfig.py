@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 """
-Copyright (C) 2017  Alexander Sosna <alexander.sosna@credativ.de>
+Copyright (C) 2017  Alexander Sosna <alexander@xxor.de>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -221,12 +221,13 @@ def format_for_pg_conf(si):
 def persist_conf(pg_out, pg_in, log):
     """Persit all not blacklisted settings form pg_out to the config file"""
     try:
-        filehandle = open(pg_in['conf'], 'r+')
+        fh = open(pg_in['conf'], 'r+')
     except IOError:
         log.error(
             'Unable to open postgresql.conf for writing, ' + pg_in['conf'])
         sys.exit(1)
-    filehandle.close()
+    os.fsync(fh)
+    fh.close()
 
     for key, value in sorted(pg_out.items()):
         if key in pg_in['blacklist']:
@@ -290,6 +291,7 @@ def write_test(testfile, log):
             sys.exit(1)
         fh.write(testdata)
         fh.flush()
+        os.fsync(fh)
         fh.close()
         delta = datetime.now() - startTime
         runtime.append(delta.microseconds)
@@ -314,15 +316,18 @@ def write_bench(testfile, log):
     log.debug("median:\t%sµs", med)
     log.debug("mean:\t%sµs", mean)
 
+    # Small cloud instance
+    # DEBUG - median: 399309µs
+    # DEBUG - mean:   404809µs
     # Example disk (5400rpm RAID1)
-    # DEBUG - median: 214289µs
-    # DEBUG - mean:   153168µs
+    # DEBUG - median: 247153µs
+    # DEBUG - mean:   260350µs
     # Example ssd (NVME Samsung SSD 960 EVO 500GB)
-    # DEBUG - median:  24947µs
-    # DEBUG - mean:    26861µs
-    if med > 100000 or mean > 120000:
+    # DEBUG - median:  45107µs
+    # DEBUG - mean:    45837µs
+    if med > 300000 or mean > 340000:
         return "slow"
-    elif med > 40000 or mean > 50000:
+    elif med > 60000 or mean > 64000:
         return "medium"
     else:
         return "fast"
@@ -366,15 +371,15 @@ def main():
 
     # Get cmd arguments
     parser = argparse.ArgumentParser(
-        description="""Tool to set optimized defaults for PostgreSQL
-        in virtual environments
-        (changes settings without asking for confirmation).""",
-        epilog="""Should be run as the same user as PostgreSQL.
+        description="""Tool to initially set optimized defaults for PostgreSQL
+        in virtualized environments.
+        Settings are changed without asking for confirmation.""",
+        epilog="""pg_cloudconfig should be run as the same user as PostgreSQL.
         pg_version and pg_clustername are used to choose a cluster.
          It is assumed that the Debian / postgresql-common naming and
          configuration schema is used.
          If this is not the case --pg_conf_dir needs to be set.
-         pg_conftool is used to get/set settings and is required!
+         pg_conftool is used to get/set settings.
          This does not tune PostgreSQL for any specific workload but only
          tries to set some optimized defaults based on a few input variables
          and simple rules.""")
@@ -397,7 +402,8 @@ def main():
     parser.add_argument(
         '--dynamic_only',
         action='store_true',
-        help='do not set static optimized defaults')
+        help='do not set static optimized defaults,' +
+        ' only set values dynamic calculated')
     parser.add_argument(
         '--blacklist',
         nargs='+',

@@ -26,7 +26,7 @@ setup(
     version=find_version("pg_cloudconfig", "pg_cloudconfig.py"),
     license='GPL3',
     author='Alexander Sosna',
-    author_email='alexander.sosna@credativ.de',
+    author_email='alexander@xxor.de',
     description=
     'Tool to set optimized defaults for PostgreSQL in virtual environments.',
     keywords="postgres postgresql tune tuning cloud",

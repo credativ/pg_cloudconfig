@@ -8,6 +8,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+.pybuild
 build/
 develop-eggs/
 dist/
@@ -107,3 +108,7 @@ venv.bak/
 ~*
 .vagrant
 .vscode
+debian/pg-cloudconfig*
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/files
