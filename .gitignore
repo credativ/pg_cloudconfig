@@ -112,3 +112,6 @@ debian/pg-cloudconfig*
 debian/.debhelper/
 debian/debhelper-build-stamp
 debian/files
+
+# generated manpage
+pg_cloudconfig.1
