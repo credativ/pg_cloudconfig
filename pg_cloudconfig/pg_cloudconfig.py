@@ -226,7 +226,6 @@ def persist_conf(pg_out, pg_in, log):
         log.error(
             'Unable to open postgresql.conf for writing, ' + pg_in['conf'])
         sys.exit(1)
-    os.fsync(fh)
     fh.close()
 
     for key, value in sorted(pg_out.items()):
@@ -274,14 +273,15 @@ def data_directory(pg):
     return get_setting(pg, "data_directory")
 
 
-def write_test(testfile, log):
-    """Performs a test write of 5 times 16MB and returns the needed time"""
+def write_test(testfile, log, n, size_byte):
+    """Write test of "n" times "size_byte" and returns troughput in MB/s"""
     testdata = repeat_to_length(
         """This is a test string and should be much more random
         !11!!!1!!!djefoirhnfonndojwpdojawpodjpajdpoajdpaojdpjadpojadoja""",
-        (1024 * 1024 * 16))
+        size_byte)
     runtime = []
-    for i in range(0, 5):
+    troughput_MBs = []
+    for i in range(0, n):
         startTime = datetime.now()
         try:
             fh = open(testfile, 'w+')
@@ -295,39 +295,43 @@ def write_test(testfile, log):
         fh.close()
         delta = datetime.now() - startTime
         runtime.append(delta.microseconds)
+
+        troughput_MBs.append(size_byte / delta.microseconds)
     os.remove(testfile)
-    return runtime
+    return troughput_MBs
 
 
 def write_bench(testfile, log):
     """Estimates the write performance (slow|medium|fast)"""
     # Do multiple test runs and wait some time
     # so the test is less likely to run in an anomaly
-    results = write_test(testfile, log)
-    time.sleep(0.5)
-    results += write_test(testfile, log)
-    time.sleep(0.5)
-    results += write_test(testfile, log)
+
+    # Test troughput for larger files, like WAL
+    test_runs = 5
+    test_size_byte = 1000 * 1000 * 16
+
+    results = write_test(testfile, log, test_runs, test_size_byte)
 
     for i in results:
-        log.debug("test run took %dµs", i)
+        log.debug("troughput: %dMB/s", i)
     med = int(median(results))
     mean = int(sum(results) / len(results))
-    log.debug("median:\t%sµs", med)
-    log.debug("mean:\t%sµs", mean)
+    log.debug("median:\t%sMB/s", med)
+    log.debug("mean:\t%sMB/s", mean)
 
     # Small cloud instance
-    # DEBUG - median: 399309µs
-    # DEBUG - mean:   404809µs
+    # DEBUG - median: 71MB/s
+    # DEBUG - mean:   64MB/s
     # Example disk (5400rpm RAID1)
-    # DEBUG - median: 247153µs
-    # DEBUG - mean:   260350µs
+    # DEBUG - median: 57MB/s
+    # DEBUG - mean:   56MB/s
     # Example ssd (NVME Samsung SSD 960 EVO 500GB)
-    # DEBUG - median:  45107µs
-    # DEBUG - mean:    45837µs
-    if med > 300000 or mean > 340000:
+    # DEBUG - median: 263MB/s
+    # DEBUG - mean:   294MB/s
+
+    if med < 128 or mean < 128:
         return "slow"
-    elif med > 60000 or mean > 64000:
+    elif med < 256 or mean < 256:
         return "medium"
     else:
         return "fast"
