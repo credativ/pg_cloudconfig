@@ -446,8 +446,7 @@ def main():
 
     # If --pg_conf_dir is set, use it insted of default
     if args.pg_conf_dir > "":
-        pg['conf_dir'] = os.path.join(args.pg_conf_dir, pg['conf'],
-                                      pg['conf_dir'], "postgresql.conf")
+        pg['conf_dir'] = args.pg_conf_dir
     else:
         pg['conf_dir'] = os.path.join("/etc/postgresql", pg['version'],
                                       pg['clustername'])
