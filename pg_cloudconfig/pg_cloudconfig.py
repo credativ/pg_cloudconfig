@@ -307,10 +307,12 @@ def write_bench(testfile, log):
     # so the test is less likely to run in an anomaly
 
     # Test troughput for larger files, like WAL
+    # The sleep between the runs should compensate measurement problems
     test_runs = 5
     test_size_byte = 1000 * 1000 * 16
-
     results = write_test(testfile, log, test_runs, test_size_byte)
+    time.sleep(1)
+    results += write_test(testfile, log, test_runs, test_size_byte)
 
     for i in results:
         log.debug("troughput: %dMB/s", i)
@@ -332,6 +334,44 @@ def write_bench(testfile, log):
     if med < 128 or mean < 128:
         return "slow"
     elif med < 256 or mean < 256:
+        return "medium"
+    else:
+        return "fast"
+
+
+def io_bench(testfile, log):
+    """Estimates the IO performance (slow|medium|fast)"""
+    # Do multiple test runs and wait some time
+    # so the test is less likely to run in an anomaly
+
+    # Test troughput for small 8k files, like WAL
+    # The sleep between the runs should compensate measurement problems
+    test_runs = 128
+    test_size_byte = 1000 * 8
+    results = write_test(testfile, log, test_runs, test_size_byte)
+    time.sleep(1)
+    results += write_test(testfile, log, test_runs, test_size_byte)
+
+    med = round(median(results), 2)
+    mean = round(sum(results) / len(results), 2)
+    log.debug("median:\t%sMB/s", med)
+    log.debug("mean:\t%sMB/s", mean)
+
+    # Small cloud instance
+    # DEBUG - median: 0.62MB/s
+    # DEBUG - mean:   0.58MB/s
+    #
+    # Example disk (5400rpm RAID1)
+    # DEBUG - median: 0.24MB/s
+    # DEBUG - mean:   0.23MB/s
+    #
+    # Example ssd (NVME Samsung SSD 960 EVO 500GB)
+    # DEBUG - median: 2.15MB/s
+    # DEBUG - mean:   2.09MB/s
+
+    if med < 0.5 or mean < 0.5:
+        return "slow"
+    elif med < 1.5 or mean < 1.5:
         return "medium"
     else:
         return "fast"
@@ -499,6 +539,12 @@ def main():
     pg['disk_speed'] = write_bench(
         os.path.join(pg['data_directory'], "~write_test.dat"), log)
     log.info("Disk was benched as: %s (slow|medium|fast)", pg['disk_speed'])
+
+    # Is not used at the moment
+    # log.info("Start io_bench...")
+    # pg['disk_io'] = io_bench(
+    #     os.path.join(pg['data_directory'], "~io_test.dat"), log)
+    # log.info("Disk IO was benched as: %s (slow|medium|fast)", pg['disk_io'])
 
     log.info("Calculate settings...")
     no_static = args.dynamic_only
