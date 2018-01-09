@@ -1,3 +1,9 @@
+pg-cloudconfig (0.8) UNRELEASED; urgency=medium
+
+  * Add autopkgtest.
+
+ -- Christoph Berg <christoph.berg@credativ.de>  Tue, 09 Jan 2018 16:36:28 +0100
+
 pg-cloudconfig (0.7) unstable; urgency=medium
 
   * Initial Release.

@@ -1,0 +1,3 @@
+Depends: @, postgresql
+Tests: run
+Restrictions: allow-stderr

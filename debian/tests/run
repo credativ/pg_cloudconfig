@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -eux
+
+pg_virtualenv <<-'EOF'
+	set -eux
+	set -- $(pg_lsclusters -h)
+	pg_cloudconfig --pg_conf_dir $PG_CLUSTER_CONF_ROOT/$1/$2 $1 $2
+	cpt=$(pg_conftool show checkpoint_timeout)
+	[ "$cpt" = "15min" ]
+EOF
