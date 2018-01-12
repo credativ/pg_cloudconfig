@@ -1,4 +1,4 @@
-pg-cloudconfig (0.8) UNRELEASED; urgency=medium
+pg-cloudconfig (0.8) unstable; urgency=medium
 
   * Add autopkgtest.
 
