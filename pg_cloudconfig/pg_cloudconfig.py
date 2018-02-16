@@ -82,13 +82,17 @@ def round_power_of_2_floor_mb(mem):
     floor_mb = int(math.pow(2, math.floor(math.log(mem_mb, 2))))
     return floor_mb * ureg.megabyte
 
+def round_mb(mem):
+    """Round memory return in MB"""
+    mem_mb = mem.to(ureg.megabyte).magnitude
+    return round(mem_mb) * ureg.megabyte
 
 def shared_buffers(system):
     """Calculate the shared_buffers"""
     total = system['memory']['total']
 
     # Get a candidate value
-    candidate = total / 5
+    candidate = total / 8
 
     # Special cases for small memory
     if total < 4096 * ureg.megabyte:
@@ -99,14 +103,11 @@ def shared_buffers(system):
             sb = 64 * ureg.megabyte
         if total < 256 * ureg.megabyte:
             sb = 16 * ureg.megabyte
-        if total < 128 * ureg.megabyte:
-            sb = 4 * ureg.megabyte
     # Special case if shared_buffers would be > 16GB
     elif candidate > 16 * ureg.gigabyte:
         sb = 16 * ureg.gigabyte
     else:
         sb = candidate
-
     return round_power_of_2_floor_mb(sb)
 
 
@@ -116,7 +117,7 @@ def maintenance_work_mem(system):
     total = system['memory']['total']
 
     # Get a candidate value
-    candidate = total / 10
+    candidate = total / 16
 
     # Special cases for high memory
     if candidate > 8 * ureg.gigabyte:
@@ -126,61 +127,34 @@ def maintenance_work_mem(system):
     return round_power_of_2_floor_mb(mwm)
 
 
-def max_connections(pg_out, pg_in, system):
-    """Calculate the max_connections"""
-    # If max_connections are given we use it
-    if pg_in['max_connections'] > 0:
-        return pg_in['max_connections']
-
-    # Possible max_connections based on cpu_count
-    cpu_candidate = system['cpu_count'] * 12
-
-    connection_ram = system['memory']['total'].to(ureg.megabyte).magnitude
-    # keep some space for the OS fs cache
-    connection_ram -= system['memory']['total'].to(
-        ureg.megabyte).magnitude / 10
-    connection_ram -= pg_out['shared_buffers'].to(ureg.megabyte).magnitude
-    connection_ram -= pg_out['maintenance_work_mem'].to(
-        ureg.megabyte).magnitude
-
-    # Estimate possible workmem
-    workmem_candidate = round_power_of_2_floor(connection_ram / cpu_candidate)
-
-    # Calculate possible max_connections based on workmem only
-    return int(round(connection_ram / workmem_candidate, -1))
-
-
-def work_mem(pg_out, system):
+def work_mem(pg_in, system):
     """Calculate the work_mem"""
-    connection_ram = system['memory']['total']
-    connection_ram -= pg_out['shared_buffers']
-    connection_ram -= pg_out['maintenance_work_mem']
+    connection_ram = system['memory']['total'] / 5
     return round_power_of_2_floor_mb(
-        connection_ram / pg_out['max_connections'])
+        connection_ram / int(pg_in['max_connections']))
 
 
 def effective_cache_size(pg_out, pg_in, system):
     """Calculate the effective_cache_size"""
-    usage_factor = 0.6
+    usage_factor = 1
     cache_ram = system['memory']['total']
     cache_ram -= pg_out['shared_buffers']
     cache_ram -= pg_out['maintenance_work_mem']
-    cache_ram -= pg_out['work_mem'] * pg_out['max_connections'] * usage_factor
+    cache_ram -= pg_out['work_mem'] * pg_in['max_connections'] * usage_factor
 
     # If we are running on fast SSDs we can assume a larger cash
     # to push PostgreSQL to do less sequential scans
     if pg_in['disk_speed'] == "fast":
-        cache_ram *= 2
+        cache_ram *= 1.5
+    return round_mb(cache_ram)
 
-    return round_power_of_2_floor_mb(cache_ram)
 
-
-def superuser_reserved_connections(pg_out):
+def superuser_reserved_connections(pg_in):
     """Calculate the superuser_reserved_connections"""
     src = 7
-    if pg_out['max_connections'] <= (src * 30):
+    if pg_in['max_connections'] <= (src * 30):
         src = 5
-    elif pg_out['max_connections'] >= (src * 100):
+    elif pg_in['max_connections'] >= (src * 100):
         src = 10
     return src
 
@@ -190,9 +164,9 @@ def autovacuum_max_workers(system):
     cc = system['cpu_count']
     avmw = 3
     if cc >= 16:
+        avmw = 4
+    if cc >= 32:
         avmw = 5
-    if cc > 64:
-        avmw = 7
     return int(avmw)
 
 
@@ -385,7 +359,7 @@ def tune(pg_in, system, no_static, log):
         sys.exit(1)
 
     pg_out = {}
-    # Static settings
+    # Static settings, these are general defaults
     if not no_static:
         pg_out['wal_level'] = "replica"
         pg_out['checkpoint_timeout'] = "15min"
@@ -396,12 +370,11 @@ def tune(pg_in, system, no_static, log):
     # Dynamic setting
     pg_out['shared_buffers'] = shared_buffers(system)
     pg_out['maintenance_work_mem'] = maintenance_work_mem(system)
-    pg_out['max_connections'] = max_connections(pg_out, pg_in, system)
-    pg_out['work_mem'] = work_mem(pg_out, system)
+    pg_out['work_mem'] = work_mem(pg_in, system)
     pg_out['effective_cache_size'] = effective_cache_size(
         pg_out, pg_in, system)
     pg_out['superuser_reserved_connections'] = superuser_reserved_connections(
-        pg_out)
+        pg_in)
     pg_out['autovacuum_max_workers'] = autovacuum_max_workers(system)
     pg_out['vacuum_cost_limit'] = vacuum_cost_limit(pg_in)
     return pg_out
@@ -496,11 +469,6 @@ def main():
                                       pg['clustername'])
     pg['conf'] = os.path.join(pg['conf_dir'], "postgresql.conf")
 
-    if args.max_connections > "":
-        pg['max_connections'] = args.max_connections
-    else:
-        pg['max_connections'] = -1
-
     log.info("Cluster to tune:\t %s/%s", pg['version'], pg['clustername'])
     log.info("conf_dir:\t %s", pg['conf_dir'])
 
@@ -514,6 +482,14 @@ def main():
 
     pg['data_directory'] = data_directory(pg)
     log.info("data_directory:\t %s", pg['data_directory'])
+
+    # If max_connections are not given, read from config
+    if args.max_connections > "":
+        pg['max_connections'] = int(args.max_connections)
+        log.info("max_connections:\t %s (given)", pg['max_connections'])
+    else:
+        pg['max_connections'] = int(get_setting(pg,"max_connections"))
+        log.info("max_connections:\t %s (read from config)", pg['max_connections'])
 
     # Check if needed tools are available
     log.debug("Checking tools")
