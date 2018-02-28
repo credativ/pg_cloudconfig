@@ -28,7 +28,7 @@ from datetime import datetime
 from statistics import median
 from pint import UnitRegistry
 # Global variables
-__version__ = '0.8'
+__version__ = '0.9'
 VERSION = __version__
 SUPPORTED_VERSIONS = ['10', '9.6']
 TOOLS = [[
