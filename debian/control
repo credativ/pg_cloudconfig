@@ -2,6 +2,7 @@ Source: pg-cloudconfig
 Section: database
 Priority: optional
 Maintainer: Alexander Sosna <alexander@xxor.de>
+Uploaders: Adrian Vondendriesch <adrian.vondendriesch@credativ.de>
 Build-Depends: debhelper (>= 10), dh-python, help2man, python3-setuptools, python3-all, python3-pint
 Standards-Version: 4.1.3
 Homepage: https://github.com/credativ/pg_cloudconfig
