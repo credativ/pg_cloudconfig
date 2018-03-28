@@ -12,6 +12,7 @@ Vagrant.configure("2") do |config|
 
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://atlas.hashicorp.com/search.
+  Vagrant::DEFAULT_SERVER_URL.replace('https://app.vagrantup.com/')
   config.vm.box = "debian/stretch64"
 
   # Disable automatic box update checking. If you disable this, then
@@ -67,6 +68,6 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", inline: <<-SHELL
      apt-get update
      apt-get install -y postgresql python3-psutil python3-pint
-     ln -s /vagrant/pg_cloudconfig /bin/pg_cloudconfig
+     ln -s /vagrant/pg_cloudconfig/pg_cloudconfig.py /usr/bin/pg_cloudconfig
   SHELL
 end
