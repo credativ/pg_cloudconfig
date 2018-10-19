@@ -1,3 +1,9 @@
+pg-cloudconfig (0.10) unstable; urgency=medium
+
+  * Support PostgreSQL 11
+
+ -- Alexander Sosna <alexander@xxor.de>  Fri, 19 Oct 2018 10:57:05 +0100
+
 pg-cloudconfig (0.9) unstable; urgency=medium
 
   * Do not change max_connections by default

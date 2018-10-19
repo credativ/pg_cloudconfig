@@ -28,9 +28,9 @@ from datetime import datetime
 from statistics import median
 from pint import UnitRegistry
 # Global variables
-__version__ = '0.9'
+__version__ = '0.10'
 VERSION = __version__
-SUPPORTED_VERSIONS = ['10', '9.6']
+SUPPORTED_VERSIONS = ['11', '10', '9.6']
 TOOLS = [[
     'This tool is needed to read and write PostgreSQL Settings',
     ['pg_conftool', '--help']
