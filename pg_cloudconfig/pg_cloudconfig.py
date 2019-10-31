@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 """
-Copyright (C) 2017  Alexander Sosna <alexander@xxor.de>
+Copyright (C) 2017-2019  Alexander Sosna <alexander@xxor.de>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,9 +28,9 @@ from datetime import datetime
 from statistics import median
 from pint import UnitRegistry
 # Global variables
-__version__ = '0.10'
+__version__ = '0.11'
 VERSION = __version__
-SUPPORTED_VERSIONS = ['11', '10', '9.6']
+SUPPORTED_VERSIONS = ['12', '11', '10', '9.6']
 TOOLS = [[
     'This tool is needed to read and write PostgreSQL Settings',
     ['pg_conftool', '--help']
@@ -354,9 +354,8 @@ def io_bench(testfile, log):
 def tune(pg_in, system, no_static, log):
     """Set multiple PostgreSQL settings according to the given input"""
     if not pg_in['version'] in SUPPORTED_VERSIONS:
-        log.error("Version is not supported: %s", pg_in['version'])
+        log.warning("Version is not supported: %s", pg_in['version'])
         log.info("Supported versions: %s", SUPPORTED_VERSIONS)
-        sys.exit(1)
 
     pg_out = {}
     # Static settings, these are general defaults

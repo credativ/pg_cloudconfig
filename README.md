@@ -40,7 +40,7 @@ The following dependencies are required
 vagrant up
 vagrant ssh
 sudo su postgres
-pg_cloudconfig 9.6 main
+pg_cloudconfig 12 main
 ```
 
 # Usage
@@ -84,5 +84,5 @@ some optimized defaults based on a few input variables and simple rules.
 ## Example
 
 ```bash
-pg_cloudconfig 10 main
+pg_cloudconfig 12 main
 ```

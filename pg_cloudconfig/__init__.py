@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 """
-Copyright (C) 2017  Alexander Sosna <alexander@xxor.de>
+Copyright (C) 2017-2019  Alexander Sosna <alexander@xxor.de>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
