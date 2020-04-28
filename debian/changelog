@@ -1,3 +1,9 @@
+pg-cloudconfig (0.12) UNRELEASED; urgency=medium
+
+  * Remove unnecessary X-Python{,3}-Version field in debian/control.
+
+ -- Debian Janitor <janitor@jelmer.uk>  Tue, 28 Apr 2020 22:39:34 +0000
+
 pg-cloudconfig (0.11) unstable; urgency=medium
 
   * Support PostgreSQL 12
