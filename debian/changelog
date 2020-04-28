@@ -1,6 +1,7 @@
 pg-cloudconfig (0.12) UNRELEASED; urgency=medium
 
   * Remove unnecessary X-Python{,3}-Version field in debian/control.
+  * Bump debhelper from old 10 to 12.
 
  -- Debian Janitor <janitor@jelmer.uk>  Tue, 28 Apr 2020 22:39:34 +0000
 
